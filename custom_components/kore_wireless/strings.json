@@ -1,0 +1,86 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Kore Wireless SuperSIM",
+        "description": "Enter your Kore Wireless API token to connect to your SuperSIM account.",
+        "data": {
+          "api_token": "API Token"
+        },
+        "data_description": {
+          "api_token": "Bearer token from Kore Wireless portal"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Reauthenticate Kore Wireless",
+        "description": "The API token for {title} is invalid. Please enter a new token.",
+        "data": {
+          "api_token": "API Token"
+        },
+        "data_description": {
+          "api_token": "Bearer token from Kore Wireless portal"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to Kore Wireless API",
+      "invalid_auth": "Invalid API token",
+      "unknown": "Unexpected error occurred"
+    },
+    "abort": {
+      "already_configured": "Account already configured",
+      "reauth_successful": "Reauthentication successful"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Kore Wireless Options",
+        "data": {
+          "scan_interval": "Update interval"
+        },
+        "data_description": {
+          "scan_interval": "How often to poll the Kore Wireless API (60-3600 seconds)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "status": {
+        "name": "Status"
+      },
+      "iccid": {
+        "name": "ICCID"
+      },
+      "fleet": {
+        "name": "Fleet"
+      },
+      "data_usage": {
+        "name": "Data Usage"
+      },
+      "sms_count": {
+        "name": "SMS Count"
+      },
+      "total_sims": {
+        "name": "Total SIMs"
+      },
+      "active_sims": {
+        "name": "Active SIMs"
+      },
+      "total_data_usage": {
+        "name": "Total Data Usage"
+      }
+    },
+    "binary_sensor": {
+      "active": {
+        "name": "Active"
+      }
+    },
+    "device_tracker": {
+      "location": {
+        "name": "Location"
+      }
+    }
+  }
+}
