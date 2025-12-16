@@ -315,6 +315,11 @@ class KoreWirelessDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     billing_period_end = billing_data.get("end_time")
                     break
 
+            # Sum up spending (billed data) across all SIMs
+            total_spending = sum(
+                b.get("data_total_billed", 0) or 0 for b in billing_by_sim.values()
+            )
+
             return {
                 "sims": sims,
                 "usage_by_sim": usage_by_sim,
@@ -337,6 +342,7 @@ class KoreWirelessDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     "pending_updates": total_pending_updates,
                     "billing_period_start": billing_period_start,
                     "billing_period_end": billing_period_end,
+                    "data_total_billed": total_spending,
                 },
             }
 
