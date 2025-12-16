@@ -372,6 +372,26 @@ class KoreWirelessAPI:
         """Deactivate a SIM (set status to inactive)."""
         return await self.update_sim(sid, status="inactive")
 
+    async def get_settings_updates(
+        self,
+        sim: str | None = None,
+        status: str | None = None,
+        page_size: int = 50,
+    ) -> dict[str, Any]:
+        """Get settings updates (OTA updates) for SIMs.
+
+        Args:
+            sim: Filter by SIM SID
+            status: Filter by status (scheduled, in-progress, completed)
+            page_size: Number of results per page
+        """
+        params: dict[str, Any] = {"PageSize": page_size}
+        if sim is not None:
+            params["Sim"] = sim
+        if status is not None:
+            params["Status"] = status
+        return await self._request("GET", "SettingsUpdates", params=params)
+
     async def get_account_usage_records(
         self,
         start: str | None = None,

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -35,6 +36,9 @@ DEFAULT_SIM_SENSORS = [
     "network_operator",
     "network_country",
     "ip_address",
+    "pending_updates",
+    "billing_period_start",
+    "billing_period_end",
 ]
 
 
@@ -186,6 +190,38 @@ def _get_account_sms_total(data: dict[str, Any], _: str) -> int:
     return data.get("account", {}).get("sms_total", 0)
 
 
+def _get_sim_pending_updates(data: dict[str, Any], sim_sid: str) -> int:
+    """Get SIM pending OTA updates count."""
+    return data.get("settings_by_sim", {}).get(sim_sid, {}).get("pending_updates", 0)
+
+
+def _get_sim_billing_start(data: dict[str, Any], sim_sid: str) -> datetime | None:
+    """Get SIM billing period start date."""
+    start_time = data.get("billing_by_sim", {}).get(sim_sid, {}).get("start_time")
+    if start_time:
+        try:
+            return datetime.fromisoformat(start_time.replace("Z", "+00:00"))
+        except (ValueError, AttributeError):
+            return None
+    return None
+
+
+def _get_sim_billing_end(data: dict[str, Any], sim_sid: str) -> datetime | None:
+    """Get SIM billing period end date."""
+    end_time = data.get("billing_by_sim", {}).get(sim_sid, {}).get("end_time")
+    if end_time:
+        try:
+            return datetime.fromisoformat(end_time.replace("Z", "+00:00"))
+        except (ValueError, AttributeError):
+            return None
+    return None
+
+
+def _get_account_pending_updates(data: dict[str, Any], _: str) -> int:
+    """Get account total pending OTA updates."""
+    return data.get("account", {}).get("pending_updates", 0)
+
+
 SIM_SENSOR_DESCRIPTIONS: tuple[KoreWirelessSensorEntityDescription, ...] = (
     KoreWirelessSensorEntityDescription(
         key="status",
@@ -286,6 +322,30 @@ SIM_SENSOR_DESCRIPTIONS: tuple[KoreWirelessSensorEntityDescription, ...] = (
         icon="mdi:ip-network",
         value_fn=_get_sim_ip_address,
     ),
+    KoreWirelessSensorEntityDescription(
+        key="pending_updates",
+        translation_key="pending_updates",
+        name="Pending OTA Updates",
+        icon="mdi:cellphone-arrow-down",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=_get_sim_pending_updates,
+    ),
+    KoreWirelessSensorEntityDescription(
+        key="billing_period_start",
+        translation_key="billing_period_start",
+        name="Billing Period Start",
+        icon="mdi:calendar-start",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        value_fn=_get_sim_billing_start,
+    ),
+    KoreWirelessSensorEntityDescription(
+        key="billing_period_end",
+        translation_key="billing_period_end",
+        name="Billing Period End",
+        icon="mdi:calendar-end",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        value_fn=_get_sim_billing_end,
+    ),
 )
 
 ACCOUNT_SENSOR_DESCRIPTIONS: tuple[KoreWirelessSensorEntityDescription, ...] = (
@@ -368,6 +428,15 @@ ACCOUNT_SENSOR_DESCRIPTIONS: tuple[KoreWirelessSensorEntityDescription, ...] = (
         icon="mdi:message-text",
         state_class=SensorStateClass.TOTAL_INCREASING,
         value_fn=_get_account_sms_total,
+        is_account_level=True,
+    ),
+    KoreWirelessSensorEntityDescription(
+        key="account_pending_updates",
+        translation_key="account_pending_updates",
+        name="Total Pending OTA Updates",
+        icon="mdi:cellphone-arrow-down",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=_get_account_pending_updates,
         is_account_level=True,
     ),
 )

@@ -161,6 +161,15 @@
       "ip_address": {
         "name": "IP Address"
       },
+      "pending_updates": {
+        "name": "Pending OTA Updates"
+      },
+      "billing_period_start": {
+        "name": "Billing Period Start"
+      },
+      "billing_period_end": {
+        "name": "Billing Period End"
+      },
       "total_sims": {
         "name": "Total SIMs"
       },
@@ -184,6 +193,9 @@
       },
       "account_sms_total": {
         "name": "Total SMS"
+      },
+      "account_pending_updates": {
+        "name": "Total Pending OTA Updates"
       }
     },
     "binary_sensor": {

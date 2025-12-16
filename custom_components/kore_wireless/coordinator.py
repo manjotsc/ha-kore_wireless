@@ -230,6 +230,49 @@ class KoreWirelessDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     except KoreWirelessAPIError:
                         sms_by_sim[sim_sid] = {"sent": 0, "received": 0, "total": 0}
 
+            # Get settings updates (pending OTA updates) per SIM
+            settings_by_sim: dict[str, dict[str, Any]] = {}
+            for sim in sims:
+                sim_sid = sim.get("sid")
+                if sim_sid:
+                    try:
+                        updates = await self.client.get_settings_updates(sim=sim_sid)
+                        settings_updates = updates.get("settings_updates") or updates.get("settingsUpdates") or []
+
+                        # Count pending updates
+                        pending = sum(1 for u in settings_updates if u.get("status") in ("scheduled", "in-progress"))
+                        completed = sum(1 for u in settings_updates if u.get("status") == "completed")
+
+                        settings_by_sim[sim_sid] = {
+                            "pending_updates": pending,
+                            "completed_updates": completed,
+                            "total_updates": len(settings_updates),
+                        }
+                    except KoreWirelessAuthError:
+                        raise
+                    except KoreWirelessAPIError:
+                        settings_by_sim[sim_sid] = {"pending_updates": 0, "completed_updates": 0, "total_updates": 0}
+
+            # Get billing period details per SIM
+            billing_by_sim: dict[str, dict[str, Any]] = {}
+            for sim in sims:
+                sim_sid = sim.get("sid")
+                if sim_sid:
+                    try:
+                        billing = await self.client.get_sim_billing_periods(sim_sid)
+                        periods = billing.get("billing_periods") or []
+                        if periods:
+                            current = periods[0]
+                            billing_by_sim[sim_sid] = {
+                                "start_time": current.get("start_time"),
+                                "end_time": current.get("end_time"),
+                                "data_total_billed": current.get("data_total_billed"),
+                            }
+                    except KoreWirelessAuthError:
+                        raise
+                    except KoreWirelessAPIError:
+                        pass
+
             # Calculate account-level stats
             total_sims = len(sims)
             active_sims = sum(
@@ -258,6 +301,11 @@ class KoreWirelessDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 sms.get("total", 0) for sms in sms_by_sim.values()
             )
 
+            # Sum up pending OTA updates across all SIMs
+            total_pending_updates = sum(
+                s.get("pending_updates", 0) for s in settings_by_sim.values()
+            )
+
             return {
                 "sims": sims,
                 "usage_by_sim": usage_by_sim,
@@ -266,6 +314,8 @@ class KoreWirelessDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "network_by_sim": network_by_sim,
                 "networks": networks_by_sid,
                 "fleets": fleets_by_sid,
+                "settings_by_sim": settings_by_sim,
+                "billing_by_sim": billing_by_sim,
                 "account": {
                     "total_sims": total_sims,
                     "active_sims": active_sims,
@@ -275,6 +325,7 @@ class KoreWirelessDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     "sms_sent": total_sms_sent,
                     "sms_received": total_sms_received,
                     "sms_total": total_sms,
+                    "pending_updates": total_pending_updates,
                 },
             }
 
