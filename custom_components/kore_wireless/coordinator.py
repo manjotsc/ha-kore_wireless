@@ -95,23 +95,44 @@ class KoreWirelessDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                             "SIM %s totals - upload: %s, download: %s, total: %s",
                             sim_sid, total_upload, total_download, total_data,
                         )
-
-                        # Check for network info in the usage records
-                        for record in per_sim_records:
-                            network_sid = record.get("network_sid") or record.get("networkSid")
-                            if network_sid and network_sid in networks_by_sid:
-                                network_by_sim[sim_sid] = networks_by_sid[network_sid]
-                            iso_country = record.get("iso_country") or record.get("isoCountry")
-                            if iso_country:
-                                if sim_sid not in network_by_sim:
-                                    network_by_sim[sim_sid] = {}
-                                network_by_sim[sim_sid]["iso_country"] = iso_country
                     else:
                         _LOGGER.debug("No usage records found for SIM %s", sim_sid)
                 except KoreWirelessAuthError:
                     raise
                 except KoreWirelessAPIError as err:
                     _LOGGER.debug("Failed to get usage for SIM %s: %s", sim_sid, err)
+
+                # Get usage records grouped by network to find network info
+                try:
+                    network_usage = await self.client.get_usage_records(
+                        sim=sim_sid, group="network", granularity="all"
+                    )
+                    network_records = (
+                        network_usage.get("usage_records")
+                        or network_usage.get("usageRecords")
+                        or []
+                    )
+                    _LOGGER.debug("Network usage for SIM %s: %s", sim_sid, network_records)
+
+                    # Find the most recent/active network
+                    if network_records:
+                        # Get the record with most data usage (likely current network)
+                        best_record = max(
+                            network_records,
+                            key=lambda r: r.get("data_total") or r.get("dataTotal") or 0
+                        )
+                        network_sid = best_record.get("network_sid") or best_record.get("networkSid")
+                        if network_sid and network_sid in networks_by_sid:
+                            network_by_sim[sim_sid] = dict(networks_by_sid[network_sid])
+                            _LOGGER.debug(
+                                "SIM %s network: %s",
+                                sim_sid,
+                                network_by_sim[sim_sid].get("friendly_name")
+                            )
+                except KoreWirelessAuthError:
+                    raise
+                except KoreWirelessAPIError as err:
+                    _LOGGER.debug("Failed to get network usage for SIM %s: %s", sim_sid, err)
 
                 # Try to get usage from billing periods if not already found
                 if sim_sid not in usage_by_sim or not usage_by_sim[sim_sid].get("data_total"):

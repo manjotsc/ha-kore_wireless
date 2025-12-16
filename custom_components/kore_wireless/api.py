@@ -191,6 +191,9 @@ class KoreWirelessAPI:
         sim: str | None = None,
         fleet: str | None = None,
         network: str | None = None,
+        iso_country: str | None = None,
+        group: str | None = None,
+        granularity: str | None = None,
         start_time: str | None = None,
         end_time: str | None = None,
         page_size: int = 50,
@@ -201,6 +204,9 @@ class KoreWirelessAPI:
             sim: Filter by SIM SID
             fleet: Filter by Fleet SID
             network: Filter by Network SID
+            iso_country: Filter by ISO country code
+            group: Group by dimension (sim, fleet, network, isoCountry)
+            granularity: Time grouping (hour, day, all)
             start_time: ISO 8601 start time
             end_time: ISO 8601 end time
             page_size: Number of results per page
@@ -214,6 +220,12 @@ class KoreWirelessAPI:
             params["Fleet"] = fleet
         if network is not None:
             params["Network"] = network
+        if iso_country is not None:
+            params["IsoCountry"] = iso_country
+        if group is not None:
+            params["Group"] = group
+        if granularity is not None:
+            params["Granularity"] = granularity
         if start_time is not None:
             params["StartTime"] = start_time
         if end_time is not None:
