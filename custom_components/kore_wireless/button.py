@@ -29,41 +29,42 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Kore Wireless buttons from a config entry."""
-    # Check if buttons are enabled
-    options = entry.options
-    enable_buttons = options.get(CONF_ENABLE_BUTTONS, DEFAULT_ENABLE_BUTTONS)
-
-    if not enable_buttons:
-        return
-
     coordinator = entry.runtime_data.coordinator
     client = entry.runtime_data.client
 
     entities: list[ButtonEntity] = []
 
-    for sim in coordinator.data.get("sims", []):
-        sim_sid = sim.get("sid")
-        sim_name = sim.get("unique_name") or sim.get("iccid") or sim_sid
+    # Always add refresh button for account
+    entities.append(KoreWirelessRefreshButton(coordinator=coordinator))
 
-        # Add activate button
-        entities.append(
-            KoreWirelessActivateButton(
-                coordinator=coordinator,
-                client=client,
-                sim_sid=sim_sid,
-                sim_name=sim_name,
-            )
-        )
+    # Check if SIM buttons are enabled
+    options = entry.options
+    enable_buttons = options.get(CONF_ENABLE_BUTTONS, DEFAULT_ENABLE_BUTTONS)
 
-        # Add deactivate button
-        entities.append(
-            KoreWirelessDeactivateButton(
-                coordinator=coordinator,
-                client=client,
-                sim_sid=sim_sid,
-                sim_name=sim_name,
+    if enable_buttons:
+        for sim in coordinator.data.get("sims", []):
+            sim_sid = sim.get("sid")
+            sim_name = sim.get("unique_name") or sim.get("iccid") or sim_sid
+
+            # Add activate button
+            entities.append(
+                KoreWirelessActivateButton(
+                    coordinator=coordinator,
+                    client=client,
+                    sim_sid=sim_sid,
+                    sim_name=sim_name,
+                )
             )
-        )
+
+            # Add deactivate button
+            entities.append(
+                KoreWirelessDeactivateButton(
+                    coordinator=coordinator,
+                    client=client,
+                    sim_sid=sim_sid,
+                    sim_name=sim_name,
+                )
+            )
 
     async_add_entities(entities)
 
@@ -178,3 +179,37 @@ class KoreWirelessDeactivateButton(
         except Exception as err:
             _LOGGER.error("Failed to deactivate SIM %s: %s", self._sim_sid, err)
             raise
+
+
+class KoreWirelessRefreshButton(
+    CoordinatorEntity[KoreWirelessDataUpdateCoordinator], ButtonEntity
+):
+    """Button to refresh Kore Wireless data."""
+
+    _attr_has_entity_name = True
+    _attr_name = "Refresh Data"
+    _attr_icon = "mdi:refresh"
+    _attr_device_class = ButtonDeviceClass.UPDATE
+
+    def __init__(
+        self,
+        coordinator: KoreWirelessDataUpdateCoordinator,
+    ) -> None:
+        """Initialize the button."""
+        super().__init__(coordinator)
+        self._attr_unique_id = "account_refresh"
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device info."""
+        return DeviceInfo(
+            identifiers={(DOMAIN, "account")},
+            name="Kore Wireless Account",
+            manufacturer="Kore Wireless",
+            model="SuperSIM Account",
+        )
+
+    async def async_press(self) -> None:
+        """Handle the button press."""
+        _LOGGER.info("Refreshing Kore Wireless data")
+        await self.coordinator.async_request_refresh()

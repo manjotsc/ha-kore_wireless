@@ -197,6 +197,9 @@
       },
       "deactivate": {
         "name": "Deactivate"
+      },
+      "refresh": {
+        "name": "Refresh Data"
       }
     },
     "device_tracker": {
