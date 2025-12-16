@@ -1,12 +1,12 @@
 {
   "domain": "kore_wireless",
   "name": "Kore Wireless SuperSIM",
-  "codeowners": [],
+  "codeowners": ["@manjotsc"],
   "config_flow": true,
   "dependencies": ["file_upload"],
-  "documentation": "https://github.com/your-repo/ha-kore_wireless",
+  "documentation": "https://github.com/manjotsc/ha-kore_wireless",
   "iot_class": "cloud_polling",
-  "issue_tracker": "https://github.com/your-repo/ha-kore_wireless/issues",
+  "issue_tracker": "https://github.com/manjotsc/ha-kore_wireless/issues",
   "requirements": [],
   "version": "1.0.0"
 }
