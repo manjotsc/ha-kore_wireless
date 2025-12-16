@@ -306,6 +306,15 @@ class KoreWirelessDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 s.get("pending_updates", 0) for s in settings_by_sim.values()
             )
 
+            # Get account-level billing period (from first SIM with billing data)
+            billing_period_start = None
+            billing_period_end = None
+            for billing_data in billing_by_sim.values():
+                if billing_data.get("start_time"):
+                    billing_period_start = billing_data.get("start_time")
+                    billing_period_end = billing_data.get("end_time")
+                    break
+
             return {
                 "sims": sims,
                 "usage_by_sim": usage_by_sim,
@@ -326,6 +335,8 @@ class KoreWirelessDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     "sms_received": total_sms_received,
                     "sms_total": total_sms,
                     "pending_updates": total_pending_updates,
+                    "billing_period_start": billing_period_start,
+                    "billing_period_end": billing_period_end,
                 },
             }
 

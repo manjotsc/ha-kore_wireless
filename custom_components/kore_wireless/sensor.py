@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -37,8 +37,6 @@ DEFAULT_SIM_SENSORS = [
     "network_country",
     "ip_address",
     "pending_updates",
-    "billing_period_start",
-    "billing_period_end",
 ]
 
 
@@ -195,23 +193,25 @@ def _get_sim_pending_updates(data: dict[str, Any], sim_sid: str) -> int:
     return data.get("settings_by_sim", {}).get(sim_sid, {}).get("pending_updates", 0)
 
 
-def _get_sim_billing_start(data: dict[str, Any], sim_sid: str) -> datetime | None:
-    """Get SIM billing period start date."""
-    start_time = data.get("billing_by_sim", {}).get(sim_sid, {}).get("start_time")
+def _get_account_billing_start(data: dict[str, Any], _: str) -> date | None:
+    """Get account billing period start date."""
+    start_time = data.get("account", {}).get("billing_period_start")
     if start_time:
         try:
-            return datetime.fromisoformat(start_time.replace("Z", "+00:00"))
+            dt = datetime.fromisoformat(start_time.replace("Z", "+00:00"))
+            return dt.date()
         except (ValueError, AttributeError):
             return None
     return None
 
 
-def _get_sim_billing_end(data: dict[str, Any], sim_sid: str) -> datetime | None:
-    """Get SIM billing period end date."""
-    end_time = data.get("billing_by_sim", {}).get(sim_sid, {}).get("end_time")
+def _get_account_billing_end(data: dict[str, Any], _: str) -> date | None:
+    """Get account billing period end date."""
+    end_time = data.get("account", {}).get("billing_period_end")
     if end_time:
         try:
-            return datetime.fromisoformat(end_time.replace("Z", "+00:00"))
+            dt = datetime.fromisoformat(end_time.replace("Z", "+00:00"))
+            return dt.date()
         except (ValueError, AttributeError):
             return None
     return None
@@ -330,22 +330,6 @@ SIM_SENSOR_DESCRIPTIONS: tuple[KoreWirelessSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=_get_sim_pending_updates,
     ),
-    KoreWirelessSensorEntityDescription(
-        key="billing_period_start",
-        translation_key="billing_period_start",
-        name="Billing Period Start",
-        icon="mdi:calendar-start",
-        device_class=SensorDeviceClass.TIMESTAMP,
-        value_fn=_get_sim_billing_start,
-    ),
-    KoreWirelessSensorEntityDescription(
-        key="billing_period_end",
-        translation_key="billing_period_end",
-        name="Billing Period End",
-        icon="mdi:calendar-end",
-        device_class=SensorDeviceClass.TIMESTAMP,
-        value_fn=_get_sim_billing_end,
-    ),
 )
 
 ACCOUNT_SENSOR_DESCRIPTIONS: tuple[KoreWirelessSensorEntityDescription, ...] = (
@@ -437,6 +421,24 @@ ACCOUNT_SENSOR_DESCRIPTIONS: tuple[KoreWirelessSensorEntityDescription, ...] = (
         icon="mdi:cellphone-arrow-down",
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=_get_account_pending_updates,
+        is_account_level=True,
+    ),
+    KoreWirelessSensorEntityDescription(
+        key="billing_period_start",
+        translation_key="billing_period_start",
+        name="Billing Period Start",
+        icon="mdi:calendar-start",
+        device_class=SensorDeviceClass.DATE,
+        value_fn=_get_account_billing_start,
+        is_account_level=True,
+    ),
+    KoreWirelessSensorEntityDescription(
+        key="billing_period_end",
+        translation_key="billing_period_end",
+        name="Billing Period End",
+        icon="mdi:calendar-end",
+        device_class=SensorDeviceClass.DATE,
+        value_fn=_get_account_billing_end,
         is_account_level=True,
     ),
 )
