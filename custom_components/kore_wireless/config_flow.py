@@ -16,9 +16,13 @@ from homeassistant.const import CONF_SCAN_INTERVAL
 from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
+    BooleanSelector,
     NumberSelector,
     NumberSelectorConfig,
     NumberSelectorMode,
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
     TextSelector,
     TextSelectorConfig,
     TextSelectorType,
@@ -28,6 +32,20 @@ from .api import KoreWirelessAPI, KoreWirelessAuthError, KoreWirelessConnectionE
 from .const import (
     CONF_CLIENT_ID,
     CONF_CLIENT_SECRET,
+    CONF_ENABLE_BUTTONS,
+    CONF_ENABLE_ACCOUNT_SENSORS,
+    CONF_SENSOR_DATA_DOWNLOAD,
+    CONF_SENSOR_DATA_TOTAL,
+    CONF_SENSOR_DATA_UPLOAD,
+    CONF_SENSOR_FLEET,
+    CONF_SENSOR_ICCID,
+    CONF_SENSOR_IP_ADDRESS,
+    CONF_SENSOR_NETWORK_COUNTRY,
+    CONF_SENSOR_NETWORK_OPERATOR,
+    CONF_SENSOR_SMS_COUNT,
+    CONF_SENSOR_STATUS,
+    DEFAULT_ENABLE_BUTTONS,
+    DEFAULT_ENABLE_ACCOUNT_SENSORS,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
 )
@@ -205,13 +223,33 @@ class KoreWirelessOptionsFlowHandler(OptionsFlowWithConfigEntry):
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
 
+        # Get current options with defaults
+        options = self.config_entry.options
+
+        # Define available SIM sensor options
+        sim_sensor_options = [
+            {"value": "status", "label": "Status"},
+            {"value": "iccid", "label": "ICCID"},
+            {"value": "fleet", "label": "Fleet"},
+            {"value": "data_download", "label": "Data Download"},
+            {"value": "data_upload", "label": "Data Upload"},
+            {"value": "data_total", "label": "Total Usage"},
+            {"value": "sms_count", "label": "SMS Count"},
+            {"value": "network_operator", "label": "Network Operator"},
+            {"value": "network_country", "label": "Network Country"},
+            {"value": "ip_address", "label": "IP Address"},
+        ]
+
+        # Default all sensors enabled
+        default_sim_sensors = [opt["value"] for opt in sim_sensor_options]
+
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(
                 {
                     vol.Optional(
                         CONF_SCAN_INTERVAL,
-                        default=self.config_entry.options.get(
+                        default=options.get(
                             CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
                         ),
                     ): NumberSelector(
@@ -221,6 +259,28 @@ class KoreWirelessOptionsFlowHandler(OptionsFlowWithConfigEntry):
                             step=60,
                             mode=NumberSelectorMode.BOX,
                             unit_of_measurement="seconds",
+                        )
+                    ),
+                    vol.Optional(
+                        CONF_ENABLE_BUTTONS,
+                        default=options.get(
+                            CONF_ENABLE_BUTTONS, DEFAULT_ENABLE_BUTTONS
+                        ),
+                    ): BooleanSelector(),
+                    vol.Optional(
+                        CONF_ENABLE_ACCOUNT_SENSORS,
+                        default=options.get(
+                            CONF_ENABLE_ACCOUNT_SENSORS, DEFAULT_ENABLE_ACCOUNT_SENSORS
+                        ),
+                    ): BooleanSelector(),
+                    vol.Optional(
+                        "sim_sensors",
+                        default=options.get("sim_sensors", default_sim_sensors),
+                    ): SelectSelector(
+                        SelectSelectorConfig(
+                            options=sim_sensor_options,
+                            multiple=True,
+                            mode=SelectSelectorMode.DROPDOWN,
                         )
                     ),
                 }

@@ -18,15 +18,29 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import KoreWirelessConfigEntry
-from .const import DOMAIN
+from .const import CONF_ENABLE_ACCOUNT_SENSORS, DEFAULT_ENABLE_ACCOUNT_SENSORS, DOMAIN
 from .coordinator import KoreWirelessDataUpdateCoordinator
+
+# Default enabled sensors
+DEFAULT_SIM_SENSORS = [
+    "status",
+    "iccid",
+    "fleet",
+    "data_download",
+    "data_upload",
+    "data_total",
+    "sms_count",
+    "network_operator",
+    "network_country",
+    "ip_address",
+]
 
 
 def _bytes_to_mb(value: int | float | None) -> float:
     """Convert bytes to megabytes."""
     if value is None:
         return 0.0
-    return round(value / (1024 * 1024), 2)
+    return round(value / (1024 * 1024), 3)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -92,13 +106,20 @@ def _get_sim_sms_count(data: dict[str, Any], sim_sid: str) -> int:
 def _get_sim_network_operator(data: dict[str, Any], sim_sid: str) -> str | None:
     """Get SIM network operator name."""
     network = data.get("network_by_sim", {}).get(sim_sid, {})
-    return network.get("friendly_name")
+    friendly_name = network.get("friendly_name")
+    if friendly_name:
+        return friendly_name
+    # Return None if no network data (requires usage records)
+    return None
 
 
 def _get_sim_network_country(data: dict[str, Any], sim_sid: str) -> str | None:
     """Get SIM network country."""
     network = data.get("network_by_sim", {}).get(sim_sid, {})
-    return network.get("iso_country")
+    iso_country = network.get("iso_country")
+    if iso_country:
+        return iso_country.upper()
+    return None
 
 
 def _get_sim_ip_address(data: dict[str, Any], sim_sid: str) -> str | None:
@@ -106,7 +127,10 @@ def _get_sim_ip_address(data: dict[str, Any], sim_sid: str) -> str | None:
     ip_addresses = data.get("ip_by_sim", {}).get(sim_sid, [])
     if ip_addresses:
         first_ip = ip_addresses[0]
-        return first_ip.get("ip_address")
+        ip = first_ip.get("ip_address") or first_ip.get("ipAddress")
+        if ip:
+            return ip
+    # Return None if no active data session
     return None
 
 
@@ -158,16 +182,6 @@ SIM_SENSOR_DESCRIPTIONS: tuple[KoreWirelessSensorEntityDescription, ...] = (
         value_fn=_get_sim_fleet,
     ),
     KoreWirelessSensorEntityDescription(
-        key="data_upload",
-        translation_key="data_upload",
-        name="Data Upload",
-        icon="mdi:upload",
-        native_unit_of_measurement=UnitOfInformation.MEGABYTES,
-        device_class=SensorDeviceClass.DATA_SIZE,
-        state_class=SensorStateClass.TOTAL_INCREASING,
-        value_fn=_get_sim_data_upload,
-    ),
-    KoreWirelessSensorEntityDescription(
         key="data_download",
         translation_key="data_download",
         name="Data Download",
@@ -175,16 +189,29 @@ SIM_SENSOR_DESCRIPTIONS: tuple[KoreWirelessSensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfInformation.MEGABYTES,
         device_class=SensorDeviceClass.DATA_SIZE,
         state_class=SensorStateClass.TOTAL_INCREASING,
+        suggested_display_precision=3,
         value_fn=_get_sim_data_download,
+    ),
+    KoreWirelessSensorEntityDescription(
+        key="data_upload",
+        translation_key="data_upload",
+        name="Data Upload",
+        icon="mdi:upload",
+        native_unit_of_measurement=UnitOfInformation.MEGABYTES,
+        device_class=SensorDeviceClass.DATA_SIZE,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        suggested_display_precision=3,
+        value_fn=_get_sim_data_upload,
     ),
     KoreWirelessSensorEntityDescription(
         key="data_total",
         translation_key="data_total",
-        name="Data Total",
+        name="Total Usage",
         icon="mdi:chart-line",
         native_unit_of_measurement=UnitOfInformation.MEGABYTES,
         device_class=SensorDeviceClass.DATA_SIZE,
         state_class=SensorStateClass.TOTAL_INCREASING,
+        suggested_display_precision=3,
         value_fn=_get_sim_data_total,
     ),
     KoreWirelessSensorEntityDescription(
@@ -245,6 +272,7 @@ ACCOUNT_SENSOR_DESCRIPTIONS: tuple[KoreWirelessSensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfInformation.MEGABYTES,
         device_class=SensorDeviceClass.DATA_SIZE,
         state_class=SensorStateClass.TOTAL_INCREASING,
+        suggested_display_precision=3,
         value_fn=_get_account_data_upload,
         is_account_level=True,
     ),
@@ -256,6 +284,7 @@ ACCOUNT_SENSOR_DESCRIPTIONS: tuple[KoreWirelessSensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfInformation.MEGABYTES,
         device_class=SensorDeviceClass.DATA_SIZE,
         state_class=SensorStateClass.TOTAL_INCREASING,
+        suggested_display_precision=3,
         value_fn=_get_account_data_download,
         is_account_level=True,
     ),
@@ -267,6 +296,7 @@ ACCOUNT_SENSOR_DESCRIPTIONS: tuple[KoreWirelessSensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfInformation.MEGABYTES,
         device_class=SensorDeviceClass.DATA_SIZE,
         state_class=SensorStateClass.TOTAL_INCREASING,
+        suggested_display_precision=3,
         value_fn=_get_account_data_total,
         is_account_level=True,
     ),
@@ -281,31 +311,41 @@ async def async_setup_entry(
     """Set up Kore Wireless sensors from a config entry."""
     coordinator = entry.runtime_data.coordinator
 
+    # Get options
+    options = entry.options
+    enabled_sim_sensors = options.get("sim_sensors", DEFAULT_SIM_SENSORS)
+    enable_account_sensors = options.get(
+        CONF_ENABLE_ACCOUNT_SENSORS, DEFAULT_ENABLE_ACCOUNT_SENSORS
+    )
+
     entities: list[SensorEntity] = []
 
-    # Add per-SIM sensors
+    # Add per-SIM sensors (only enabled ones)
     for sim in coordinator.data.get("sims", []):
         sim_sid = sim.get("sid")
         sim_name = sim.get("unique_name") or sim.get("iccid") or sim_sid
 
         for description in SIM_SENSOR_DESCRIPTIONS:
+            # Check if this sensor type is enabled
+            if description.key in enabled_sim_sensors:
+                entities.append(
+                    KoreWirelessSimSensor(
+                        coordinator=coordinator,
+                        description=description,
+                        sim_sid=sim_sid,
+                        sim_name=sim_name,
+                    )
+                )
+
+    # Add account-level sensors (if enabled)
+    if enable_account_sensors:
+        for description in ACCOUNT_SENSOR_DESCRIPTIONS:
             entities.append(
-                KoreWirelessSimSensor(
+                KoreWirelessAccountSensor(
                     coordinator=coordinator,
                     description=description,
-                    sim_sid=sim_sid,
-                    sim_name=sim_name,
                 )
             )
-
-    # Add account-level sensors
-    for description in ACCOUNT_SENSOR_DESCRIPTIONS:
-        entities.append(
-            KoreWirelessAccountSensor(
-                coordinator=coordinator,
-                description=description,
-            )
-        )
 
     async_add_entities(entities)
 

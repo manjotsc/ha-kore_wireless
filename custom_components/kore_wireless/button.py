@@ -11,7 +11,13 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import KoreWirelessConfigEntry
-from .const import DOMAIN, SIM_STATUS_ACTIVE, SIM_STATUS_INACTIVE
+from .const import (
+    CONF_ENABLE_BUTTONS,
+    DEFAULT_ENABLE_BUTTONS,
+    DOMAIN,
+    SIM_STATUS_ACTIVE,
+    SIM_STATUS_INACTIVE,
+)
 from .coordinator import KoreWirelessDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -23,6 +29,13 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Kore Wireless buttons from a config entry."""
+    # Check if buttons are enabled
+    options = entry.options
+    enable_buttons = options.get(CONF_ENABLE_BUTTONS, DEFAULT_ENABLE_BUTTONS)
+
+    if not enable_buttons:
+        return
+
     coordinator = entry.runtime_data.coordinator
     client = entry.runtime_data.client
 

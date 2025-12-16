@@ -54,82 +54,111 @@ class KoreWirelessDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             ip_by_sim: dict[str, list[dict[str, Any]]] = {}
             network_by_sim: dict[str, dict[str, Any]] = {}
 
-            # Get usage records grouped by SIM to get totals
-            try:
-                sim_usage_response = await self.client.get_usage_records(
-                    granularity="all",
-                    group="sim",
-                )
-                usage_records = sim_usage_response.get("usage_records", [])
-                for record in usage_records:
-                    sim_sid = record.get("sim_sid")
-                    if sim_sid:
-                        usage_by_sim[sim_sid] = {
-                            "data_upload": record.get("data_upload", 0),
-                            "data_download": record.get("data_download", 0),
-                            "data_total": record.get("data_total", 0),
-                            "data_total_billed": record.get("data_total_billed"),
-                            "period": record.get("period", {}),
-                        }
-            except KoreWirelessAuthError:
-                raise
-            except KoreWirelessAPIError as err:
-                _LOGGER.debug("Failed to get grouped usage records: %s", err)
-
-            # Get usage records grouped by network to find which network each SIM uses
-            try:
-                network_usage_response = await self.client.get_usage_records(
-                    granularity="all",
-                    group="network",
-                )
-                network_records = network_usage_response.get("usage_records", [])
-                # Build a map of network usage
-                for record in network_records:
-                    network_sid = record.get("network_sid")
-                    if network_sid and network_sid in networks_by_sid:
-                        _LOGGER.debug("Found network usage for: %s", network_sid)
-            except KoreWirelessAuthError:
-                raise
-            except KoreWirelessAPIError as err:
-                _LOGGER.debug("Failed to get network usage records: %s", err)
-
-            # For each SIM, get per-SIM usage with network info
+            # Fetch data for each SIM
             for sim in sims:
                 sim_sid = sim.get("sid")
                 if not sim_sid:
                     continue
 
-                # Get usage for this specific SIM grouped by network to find connected network
+                # Get usage records for this SIM
                 try:
-                    sim_network_usage = await self.client.get_usage_records(
-                        sim=sim_sid,
-                        granularity="all",
-                        group="network",
+                    per_sim_usage = await self.client.get_usage_records(sim=sim_sid)
+                    _LOGGER.debug("Usage for SIM %s: %s", sim_sid, per_sim_usage)
+                    per_sim_records = (
+                        per_sim_usage.get("usage_records")
+                        or per_sim_usage.get("usageRecords")
+                        or []
                     )
-                    sim_network_records = sim_network_usage.get("usage_records", [])
-                    if sim_network_records:
-                        # Get the network with the most recent/most usage
-                        latest_record = sim_network_records[-1]
-                        network_sid = latest_record.get("network_sid")
-                        if network_sid and network_sid in networks_by_sid:
-                            network_by_sim[sim_sid] = networks_by_sid[network_sid]
-                        # Also get iso_country from the record
-                        iso_country = latest_record.get("iso_country")
-                        if iso_country and sim_sid not in network_by_sim:
-                            network_by_sim[sim_sid] = {"iso_country": iso_country}
-                        elif iso_country and sim_sid in network_by_sim:
-                            network_by_sim[sim_sid]["iso_country"] = iso_country
+                    if per_sim_records:
+                        _LOGGER.debug("Found %d usage records for SIM %s", len(per_sim_records), sim_sid)
+                        # Sum all records for this SIM
+                        total_upload = sum(
+                            r.get("data_upload") or r.get("dataUpload") or 0
+                            for r in per_sim_records
+                        )
+                        total_download = sum(
+                            r.get("data_download") or r.get("dataDownload") or 0
+                            for r in per_sim_records
+                        )
+                        total_data = sum(
+                            r.get("data_total") or r.get("dataTotal") or 0
+                            for r in per_sim_records
+                        )
+                        usage_by_sim[sim_sid] = {
+                            "data_upload": total_upload,
+                            "data_download": total_download,
+                            "data_total": total_data,
+                            "data_total_billed": None,
+                            "period": {},
+                        }
+                        _LOGGER.debug(
+                            "SIM %s totals - upload: %s, download: %s, total: %s",
+                            sim_sid, total_upload, total_download, total_data,
+                        )
+
+                        # Check for network info in the usage records
+                        for record in per_sim_records:
+                            network_sid = record.get("network_sid") or record.get("networkSid")
+                            if network_sid and network_sid in networks_by_sid:
+                                network_by_sim[sim_sid] = networks_by_sid[network_sid]
+                            iso_country = record.get("iso_country") or record.get("isoCountry")
+                            if iso_country:
+                                if sim_sid not in network_by_sim:
+                                    network_by_sim[sim_sid] = {}
+                                network_by_sim[sim_sid]["iso_country"] = iso_country
+                    else:
+                        _LOGGER.debug("No usage records found for SIM %s", sim_sid)
                 except KoreWirelessAuthError:
                     raise
                 except KoreWirelessAPIError as err:
-                    _LOGGER.debug("Failed to get network for SIM %s: %s", sim_sid, err)
+                    _LOGGER.debug("Failed to get usage for SIM %s: %s", sim_sid, err)
+
+                # Try to get usage from billing periods if not already found
+                if sim_sid not in usage_by_sim or not usage_by_sim[sim_sid].get("data_total"):
+                    try:
+                        billing_response = await self.client.get_sim_billing_periods(sim_sid)
+                        _LOGGER.debug("Billing periods for SIM %s: %s", sim_sid, billing_response)
+                        billing_periods = billing_response.get("billing_periods", [])
+                        if billing_periods:
+                            # Get the most recent (current) billing period
+                            current_period = billing_periods[0]
+                            _LOGGER.debug("Current billing period: %s", current_period)
+                            usage_by_sim[sim_sid] = {
+                                "data_upload": current_period.get("data_upload", 0),
+                                "data_download": current_period.get("data_download", 0),
+                                "data_total": current_period.get("data_total", 0),
+                                "data_total_billed": current_period.get("data_total_billed"),
+                                "period": {
+                                    "start": current_period.get("start_time"),
+                                    "end": current_period.get("end_time"),
+                                },
+                            }
+                            _LOGGER.debug(
+                                "SIM %s billing usage - upload: %s, download: %s, total: %s",
+                                sim_sid,
+                                usage_by_sim[sim_sid]["data_upload"],
+                                usage_by_sim[sim_sid]["data_download"],
+                                usage_by_sim[sim_sid]["data_total"],
+                            )
+                    except KoreWirelessAuthError:
+                        raise
+                    except KoreWirelessAPIError as err:
+                        _LOGGER.debug("Failed to get billing periods for SIM %s: %s", sim_sid, err)
 
                 # Get IP addresses
                 try:
                     ip_response = await self.client.get_sim_ip_addresses(sim_sid)
-                    ip_addresses = ip_response.get("ip_addresses", [])
+                    _LOGGER.debug("IP response for SIM %s: %s", sim_sid, ip_response)
+                    ip_addresses = (
+                        ip_response.get("ip_addresses")
+                        or ip_response.get("ipAddresses")
+                        or []
+                    )
                     if ip_addresses:
                         ip_by_sim[sim_sid] = ip_addresses
+                        _LOGGER.debug("Found IP addresses for SIM %s: %s", sim_sid, ip_addresses)
+                    else:
+                        _LOGGER.debug("No IP addresses for SIM %s (no active data session)", sim_sid)
                 except KoreWirelessAuthError:
                     raise
                 except KoreWirelessAPIError as err:

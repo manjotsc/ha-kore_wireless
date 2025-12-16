@@ -3,7 +3,11 @@
     "allow": [
       "WebSearch",
       "WebFetch(domain:docs.korewireless.com)",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:www.twilio.com)",
+      "WebFetch(domain:www.rubydoc.info)",
+      "WebFetch(domain:mockoon.com)",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ]
   }
 }

@@ -136,7 +136,9 @@ class KoreWirelessAPI:
                     raise KoreWirelessAuthError("Access forbidden")
 
                 response.raise_for_status()
-                return await response.json()
+                result = await response.json()
+                _LOGGER.debug("API response for %s: %s", endpoint, result)
+                return result
 
         except ClientResponseError as err:
             _LOGGER.error("API request failed: %s", err)
@@ -189,8 +191,6 @@ class KoreWirelessAPI:
         sim: str | None = None,
         fleet: str | None = None,
         network: str | None = None,
-        granularity: str = "all",
-        group: str | None = None,
         start_time: str | None = None,
         end_time: str | None = None,
         page_size: int = 50,
@@ -201,15 +201,12 @@ class KoreWirelessAPI:
             sim: Filter by SIM SID
             fleet: Filter by Fleet SID
             network: Filter by Network SID
-            granularity: one of 'hour', 'day', 'all' (default 'all' for totals)
-            group: Group results by 'sim', 'fleet', 'network', or 'isoCountry'
             start_time: ISO 8601 start time
             end_time: ISO 8601 end time
             page_size: Number of results per page
         """
         params: dict[str, Any] = {
             "PageSize": page_size,
-            "Granularity": granularity,
         }
         if sim is not None:
             params["Sim"] = sim
@@ -217,8 +214,6 @@ class KoreWirelessAPI:
             params["Fleet"] = fleet
         if network is not None:
             params["Network"] = network
-        if group is not None:
-            params["Group"] = group
         if start_time is not None:
             params["StartTime"] = start_time
         if end_time is not None:

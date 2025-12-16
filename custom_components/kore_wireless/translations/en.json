@@ -41,10 +41,16 @@
       "init": {
         "title": "Kore Wireless Options",
         "data": {
-          "scan_interval": "Update interval"
+          "scan_interval": "Update interval",
+          "enable_buttons": "Enable activate/deactivate buttons",
+          "enable_account_sensors": "Enable account-level sensors",
+          "sim_sensors": "SIM sensors to enable"
         },
         "data_description": {
-          "scan_interval": "How often to poll the Kore Wireless API (60-3600 seconds)"
+          "scan_interval": "How often to poll the Kore Wireless API (60-3600 seconds)",
+          "enable_buttons": "Show buttons to activate or deactivate SIM cards",
+          "enable_account_sensors": "Show account-level sensors (Total SIMs, Active SIMs, Total Usage)",
+          "sim_sensors": "Select which sensors to create for each SIM card"
         }
       }
     }
@@ -67,7 +73,7 @@
         "name": "Data Download"
       },
       "data_total": {
-        "name": "Data Total"
+        "name": "Total Usage"
       },
       "sms_count": {
         "name": "SMS Count"
