@@ -143,8 +143,14 @@
       "data_total": {
         "name": "Data Total"
       },
-      "sms_count": {
-        "name": "SMS Count"
+      "sms_received": {
+        "name": "SMS Received"
+      },
+      "sms_sent": {
+        "name": "SMS Sent"
+      },
+      "sms_total": {
+        "name": "SMS Total"
       },
       "network_operator": {
         "name": "Network Operator"
@@ -169,6 +175,15 @@
       },
       "account_data_total": {
         "name": "Total Data Usage"
+      },
+      "account_sms_received": {
+        "name": "Total SMS Received"
+      },
+      "account_sms_sent": {
+        "name": "Total SMS Sent"
+      },
+      "account_sms_total": {
+        "name": "Total SMS"
       }
     },
     "binary_sensor": {

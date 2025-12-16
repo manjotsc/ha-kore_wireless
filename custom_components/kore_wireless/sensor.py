@@ -29,7 +29,9 @@ DEFAULT_SIM_SENSORS = [
     "data_download",
     "data_upload",
     "data_total",
-    "sms_count",
+    "sms_received",
+    "sms_sent",
+    "sms_total",
     "network_operator",
     "network_country",
     "ip_address",
@@ -98,9 +100,19 @@ def _get_sim_data_total(data: dict[str, Any], sim_sid: str) -> float:
     return _bytes_to_mb(usage.get("data_total", 0))
 
 
-def _get_sim_sms_count(data: dict[str, Any], sim_sid: str) -> int:
-    """Get SIM SMS count."""
-    return data.get("sms_by_sim", {}).get(sim_sid, 0)
+def _get_sim_sms_received(data: dict[str, Any], sim_sid: str) -> int:
+    """Get SIM SMS received count."""
+    return data.get("sms_by_sim", {}).get(sim_sid, {}).get("received", 0)
+
+
+def _get_sim_sms_sent(data: dict[str, Any], sim_sid: str) -> int:
+    """Get SIM SMS sent count."""
+    return data.get("sms_by_sim", {}).get(sim_sid, {}).get("sent", 0)
+
+
+def _get_sim_sms_total(data: dict[str, Any], sim_sid: str) -> int:
+    """Get SIM SMS total count."""
+    return data.get("sms_by_sim", {}).get(sim_sid, {}).get("total", 0)
 
 
 def _get_sim_network_operator(data: dict[str, Any], sim_sid: str) -> str | None:
@@ -159,6 +171,21 @@ def _get_account_data_total(data: dict[str, Any], _: str) -> float:
     return _bytes_to_mb(data.get("account", {}).get("data_total", 0))
 
 
+def _get_account_sms_received(data: dict[str, Any], _: str) -> int:
+    """Get account total SMS received count."""
+    return data.get("account", {}).get("sms_received", 0)
+
+
+def _get_account_sms_sent(data: dict[str, Any], _: str) -> int:
+    """Get account total SMS sent count."""
+    return data.get("account", {}).get("sms_sent", 0)
+
+
+def _get_account_sms_total(data: dict[str, Any], _: str) -> int:
+    """Get account total SMS count."""
+    return data.get("account", {}).get("sms_total", 0)
+
+
 SIM_SENSOR_DESCRIPTIONS: tuple[KoreWirelessSensorEntityDescription, ...] = (
     KoreWirelessSensorEntityDescription(
         key="status",
@@ -215,12 +242,28 @@ SIM_SENSOR_DESCRIPTIONS: tuple[KoreWirelessSensorEntityDescription, ...] = (
         value_fn=_get_sim_data_total,
     ),
     KoreWirelessSensorEntityDescription(
-        key="sms_count",
-        translation_key="sms_count",
-        name="SMS Count",
+        key="sms_received",
+        translation_key="sms_received",
+        name="SMS Received",
+        icon="mdi:message-arrow-left",
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        value_fn=_get_sim_sms_received,
+    ),
+    KoreWirelessSensorEntityDescription(
+        key="sms_sent",
+        translation_key="sms_sent",
+        name="SMS Sent",
+        icon="mdi:message-arrow-right",
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        value_fn=_get_sim_sms_sent,
+    ),
+    KoreWirelessSensorEntityDescription(
+        key="sms_total",
+        translation_key="sms_total",
+        name="SMS Total",
         icon="mdi:message-text",
         state_class=SensorStateClass.TOTAL_INCREASING,
-        value_fn=_get_sim_sms_count,
+        value_fn=_get_sim_sms_total,
     ),
     KoreWirelessSensorEntityDescription(
         key="network_operator",
@@ -298,6 +341,33 @@ ACCOUNT_SENSOR_DESCRIPTIONS: tuple[KoreWirelessSensorEntityDescription, ...] = (
         state_class=SensorStateClass.TOTAL_INCREASING,
         suggested_display_precision=3,
         value_fn=_get_account_data_total,
+        is_account_level=True,
+    ),
+    KoreWirelessSensorEntityDescription(
+        key="account_sms_received",
+        translation_key="account_sms_received",
+        name="Total SMS Received",
+        icon="mdi:message-arrow-left",
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        value_fn=_get_account_sms_received,
+        is_account_level=True,
+    ),
+    KoreWirelessSensorEntityDescription(
+        key="account_sms_sent",
+        translation_key="account_sms_sent",
+        name="Total SMS Sent",
+        icon="mdi:message-arrow-right",
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        value_fn=_get_account_sms_sent,
+        is_account_level=True,
+    ),
+    KoreWirelessSensorEntityDescription(
+        key="account_sms_total",
+        translation_key="account_sms_total",
+        name="Total SMS",
+        icon="mdi:message-text",
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        value_fn=_get_account_sms_total,
         is_account_level=True,
     ),
 )

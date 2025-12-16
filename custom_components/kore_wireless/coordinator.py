@@ -169,18 +169,34 @@ class KoreWirelessDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             fleets = fleets_response.get("fleets", [])
             fleets_by_sid = {fleet["sid"]: fleet for fleet in fleets}
 
-            # Get SMS commands count per SIM
-            sms_by_sim: dict[str, int] = {}
+            # Get SMS commands count per SIM (with direction breakdown)
+            sms_by_sim: dict[str, dict[str, int]] = {}
             for sim in sims:
                 sim_sid = sim.get("sid")
                 if sim_sid:
                     try:
                         sms = await self.client.get_sms_commands(sim=sim_sid)
-                        sms_by_sim[sim_sid] = len(sms.get("sms_commands", []))
+                        sms_commands = sms.get("sms_commands") or sms.get("smsCommands") or []
+
+                        # Count by direction
+                        sent = 0  # to_sim (sent TO the device)
+                        received = 0  # from_sim (received FROM the device)
+                        for cmd in sms_commands:
+                            direction = cmd.get("direction")
+                            if direction == "to_sim":
+                                sent += 1
+                            elif direction == "from_sim":
+                                received += 1
+
+                        sms_by_sim[sim_sid] = {
+                            "sent": sent,
+                            "received": received,
+                            "total": len(sms_commands),
+                        }
                     except KoreWirelessAuthError:
                         raise
                     except KoreWirelessAPIError:
-                        sms_by_sim[sim_sid] = 0
+                        sms_by_sim[sim_sid] = {"sent": 0, "received": 0, "total": 0}
 
             # Calculate account-level stats
             total_sims = len(sims)
@@ -199,6 +215,17 @@ class KoreWirelessDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 usage.get("data_total", 0) for usage in usage_by_sim.values()
             )
 
+            # Sum up SMS across all SIMs
+            total_sms_sent = sum(
+                sms.get("sent", 0) for sms in sms_by_sim.values()
+            )
+            total_sms_received = sum(
+                sms.get("received", 0) for sms in sms_by_sim.values()
+            )
+            total_sms = sum(
+                sms.get("total", 0) for sms in sms_by_sim.values()
+            )
+
             return {
                 "sims": sims,
                 "usage_by_sim": usage_by_sim,
@@ -213,6 +240,9 @@ class KoreWirelessDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     "data_upload": total_upload,
                     "data_download": total_download,
                     "data_total": total_data,
+                    "sms_sent": total_sms_sent,
+                    "sms_received": total_sms_received,
+                    "sms_total": total_sms,
                 },
             }
 
