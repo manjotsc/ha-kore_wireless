@@ -3,11 +3,13 @@ from typing import Final
 
 DOMAIN: Final = "kore_wireless"
 
-# API
+# API URLs
 API_BASE_URL: Final = "https://supersim.api.korewireless.com/v1"
+AUTH_TOKEN_URL: Final = "https://api.korewireless.com/api-services/v1/auth/token"
 
-# Config
-CONF_API_TOKEN: Final = "api_token"
+# Config keys
+CONF_CLIENT_ID: Final = "client_id"
+CONF_CLIENT_SECRET: Final = "client_secret"
 
 # Defaults
 DEFAULT_SCAN_INTERVAL: Final = 300  # 5 minutes

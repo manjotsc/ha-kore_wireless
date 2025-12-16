@@ -22,6 +22,13 @@ from .const import DOMAIN
 from .coordinator import KoreWirelessDataUpdateCoordinator
 
 
+def _bytes_to_mb(value: int | float | None) -> float:
+    """Convert bytes to megabytes."""
+    if value is None:
+        return 0.0
+    return round(value / (1024 * 1024), 2)
+
+
 @dataclass(frozen=True, kw_only=True)
 class KoreWirelessSensorEntityDescription(SensorEntityDescription):
     """Describes Kore Wireless sensor entity."""
@@ -59,18 +66,48 @@ def _get_sim_fleet(data: dict[str, Any], sim_sid: str) -> str | None:
     return None
 
 
-def _get_sim_data_usage(data: dict[str, Any], sim_sid: str) -> float | None:
-    """Get SIM data usage in MB."""
-    usage = data.get("usage_by_sim", {}).get(sim_sid)
-    if usage:
-        bytes_used = usage.get("data_usage_bytes", 0)
-        return round(bytes_used / (1024 * 1024), 2)  # Convert to MB
-    return 0
+def _get_sim_data_upload(data: dict[str, Any], sim_sid: str) -> float:
+    """Get SIM data upload in MB."""
+    usage = data.get("usage_by_sim", {}).get(sim_sid, {})
+    return _bytes_to_mb(usage.get("data_upload", 0))
+
+
+def _get_sim_data_download(data: dict[str, Any], sim_sid: str) -> float:
+    """Get SIM data download in MB."""
+    usage = data.get("usage_by_sim", {}).get(sim_sid, {})
+    return _bytes_to_mb(usage.get("data_download", 0))
+
+
+def _get_sim_data_total(data: dict[str, Any], sim_sid: str) -> float:
+    """Get SIM total data usage in MB."""
+    usage = data.get("usage_by_sim", {}).get(sim_sid, {})
+    return _bytes_to_mb(usage.get("data_total", 0))
 
 
 def _get_sim_sms_count(data: dict[str, Any], sim_sid: str) -> int:
     """Get SIM SMS count."""
     return data.get("sms_by_sim", {}).get(sim_sid, 0)
+
+
+def _get_sim_network_operator(data: dict[str, Any], sim_sid: str) -> str | None:
+    """Get SIM network operator name."""
+    network = data.get("network_by_sim", {}).get(sim_sid, {})
+    return network.get("friendly_name")
+
+
+def _get_sim_network_country(data: dict[str, Any], sim_sid: str) -> str | None:
+    """Get SIM network country."""
+    network = data.get("network_by_sim", {}).get(sim_sid, {})
+    return network.get("iso_country")
+
+
+def _get_sim_ip_address(data: dict[str, Any], sim_sid: str) -> str | None:
+    """Get SIM IP address."""
+    ip_addresses = data.get("ip_by_sim", {}).get(sim_sid, [])
+    if ip_addresses:
+        first_ip = ip_addresses[0]
+        return first_ip.get("ip_address")
+    return None
 
 
 def _get_total_sims(data: dict[str, Any], _: str) -> int:
@@ -83,10 +120,19 @@ def _get_active_sims(data: dict[str, Any], _: str) -> int:
     return data.get("account", {}).get("active_sims", 0)
 
 
-def _get_total_data_usage(data: dict[str, Any], _: str) -> float:
-    """Get total data usage in MB."""
-    bytes_used = data.get("account", {}).get("total_data_usage_bytes", 0)
-    return round(bytes_used / (1024 * 1024), 2)  # Convert to MB
+def _get_account_data_upload(data: dict[str, Any], _: str) -> float:
+    """Get account total data upload in MB."""
+    return _bytes_to_mb(data.get("account", {}).get("data_upload", 0))
+
+
+def _get_account_data_download(data: dict[str, Any], _: str) -> float:
+    """Get account total data download in MB."""
+    return _bytes_to_mb(data.get("account", {}).get("data_download", 0))
+
+
+def _get_account_data_total(data: dict[str, Any], _: str) -> float:
+    """Get account total data usage in MB."""
+    return _bytes_to_mb(data.get("account", {}).get("data_total", 0))
 
 
 SIM_SENSOR_DESCRIPTIONS: tuple[KoreWirelessSensorEntityDescription, ...] = (
@@ -112,14 +158,34 @@ SIM_SENSOR_DESCRIPTIONS: tuple[KoreWirelessSensorEntityDescription, ...] = (
         value_fn=_get_sim_fleet,
     ),
     KoreWirelessSensorEntityDescription(
-        key="data_usage",
-        translation_key="data_usage",
-        name="Data Usage",
+        key="data_upload",
+        translation_key="data_upload",
+        name="Data Upload",
+        icon="mdi:upload",
+        native_unit_of_measurement=UnitOfInformation.MEGABYTES,
+        device_class=SensorDeviceClass.DATA_SIZE,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        value_fn=_get_sim_data_upload,
+    ),
+    KoreWirelessSensorEntityDescription(
+        key="data_download",
+        translation_key="data_download",
+        name="Data Download",
+        icon="mdi:download",
+        native_unit_of_measurement=UnitOfInformation.MEGABYTES,
+        device_class=SensorDeviceClass.DATA_SIZE,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        value_fn=_get_sim_data_download,
+    ),
+    KoreWirelessSensorEntityDescription(
+        key="data_total",
+        translation_key="data_total",
+        name="Data Total",
         icon="mdi:chart-line",
         native_unit_of_measurement=UnitOfInformation.MEGABYTES,
         device_class=SensorDeviceClass.DATA_SIZE,
         state_class=SensorStateClass.TOTAL_INCREASING,
-        value_fn=_get_sim_data_usage,
+        value_fn=_get_sim_data_total,
     ),
     KoreWirelessSensorEntityDescription(
         key="sms_count",
@@ -128,6 +194,27 @@ SIM_SENSOR_DESCRIPTIONS: tuple[KoreWirelessSensorEntityDescription, ...] = (
         icon="mdi:message-text",
         state_class=SensorStateClass.TOTAL_INCREASING,
         value_fn=_get_sim_sms_count,
+    ),
+    KoreWirelessSensorEntityDescription(
+        key="network_operator",
+        translation_key="network_operator",
+        name="Network Operator",
+        icon="mdi:antenna",
+        value_fn=_get_sim_network_operator,
+    ),
+    KoreWirelessSensorEntityDescription(
+        key="network_country",
+        translation_key="network_country",
+        name="Network Country",
+        icon="mdi:earth",
+        value_fn=_get_sim_network_country,
+    ),
+    KoreWirelessSensorEntityDescription(
+        key="ip_address",
+        translation_key="ip_address",
+        name="IP Address",
+        icon="mdi:ip-network",
+        value_fn=_get_sim_ip_address,
     ),
 )
 
@@ -151,14 +238,36 @@ ACCOUNT_SENSOR_DESCRIPTIONS: tuple[KoreWirelessSensorEntityDescription, ...] = (
         is_account_level=True,
     ),
     KoreWirelessSensorEntityDescription(
-        key="total_data_usage",
-        translation_key="total_data_usage",
+        key="account_data_upload",
+        translation_key="account_data_upload",
+        name="Total Data Upload",
+        icon="mdi:upload",
+        native_unit_of_measurement=UnitOfInformation.MEGABYTES,
+        device_class=SensorDeviceClass.DATA_SIZE,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        value_fn=_get_account_data_upload,
+        is_account_level=True,
+    ),
+    KoreWirelessSensorEntityDescription(
+        key="account_data_download",
+        translation_key="account_data_download",
+        name="Total Data Download",
+        icon="mdi:download",
+        native_unit_of_measurement=UnitOfInformation.MEGABYTES,
+        device_class=SensorDeviceClass.DATA_SIZE,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        value_fn=_get_account_data_download,
+        is_account_level=True,
+    ),
+    KoreWirelessSensorEntityDescription(
+        key="account_data_total",
+        translation_key="account_data_total",
         name="Total Data Usage",
         icon="mdi:chart-areaspline",
         native_unit_of_measurement=UnitOfInformation.MEGABYTES,
         device_class=SensorDeviceClass.DATA_SIZE,
         state_class=SensorStateClass.TOTAL_INCREASING,
-        value_fn=_get_total_data_usage,
+        value_fn=_get_account_data_total,
         is_account_level=True,
     ),
 )

@@ -3,28 +3,32 @@
     "step": {
       "user": {
         "title": "Kore Wireless SuperSIM",
-        "description": "Enter your Kore Wireless API token to connect to your SuperSIM account.",
+        "description": "Enter your Kore Wireless API credentials to connect to your SuperSIM account.",
         "data": {
-          "api_token": "API Token"
+          "client_id": "Client ID",
+          "client_secret": "Client Secret"
         },
         "data_description": {
-          "api_token": "Bearer token from Kore Wireless portal"
+          "client_id": "Client ID from Kore Wireless Developer Console",
+          "client_secret": "Client Secret from Kore Wireless Developer Console"
         }
       },
       "reauth_confirm": {
         "title": "Reauthenticate Kore Wireless",
-        "description": "The API token for {title} is invalid. Please enter a new token.",
+        "description": "The credentials for {title} are invalid. Please enter new credentials.",
         "data": {
-          "api_token": "API Token"
+          "client_id": "Client ID",
+          "client_secret": "Client Secret"
         },
         "data_description": {
-          "api_token": "Bearer token from Kore Wireless portal"
+          "client_id": "Client ID from Kore Wireless Developer Console",
+          "client_secret": "Client Secret from Kore Wireless Developer Console"
         }
       }
     },
     "error": {
       "cannot_connect": "Failed to connect to Kore Wireless API",
-      "invalid_auth": "Invalid API token",
+      "invalid_auth": "Invalid client credentials",
       "unknown": "Unexpected error occurred"
     },
     "abort": {
@@ -56,11 +60,26 @@
       "fleet": {
         "name": "Fleet"
       },
-      "data_usage": {
-        "name": "Data Usage"
+      "data_upload": {
+        "name": "Data Upload"
+      },
+      "data_download": {
+        "name": "Data Download"
+      },
+      "data_total": {
+        "name": "Data Total"
       },
       "sms_count": {
         "name": "SMS Count"
+      },
+      "network_operator": {
+        "name": "Network Operator"
+      },
+      "network_country": {
+        "name": "Network Country"
+      },
+      "ip_address": {
+        "name": "IP Address"
       },
       "total_sims": {
         "name": "Total SIMs"
@@ -68,13 +87,27 @@
       "active_sims": {
         "name": "Active SIMs"
       },
-      "total_data_usage": {
+      "account_data_upload": {
+        "name": "Total Data Upload"
+      },
+      "account_data_download": {
+        "name": "Total Data Download"
+      },
+      "account_data_total": {
         "name": "Total Data Usage"
       }
     },
     "binary_sensor": {
       "active": {
         "name": "Active"
+      }
+    },
+    "button": {
+      "activate": {
+        "name": "Activate"
+      },
+      "deactivate": {
+        "name": "Deactivate"
       }
     },
     "device_tracker": {

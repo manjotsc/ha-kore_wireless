@@ -26,7 +26,8 @@ from homeassistant.helpers.selector import (
 
 from .api import KoreWirelessAPI, KoreWirelessAuthError, KoreWirelessConnectionError
 from .const import (
-    CONF_API_TOKEN,
+    CONF_CLIENT_ID,
+    CONF_CLIENT_SECRET,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
 )
@@ -35,7 +36,10 @@ _LOGGER = logging.getLogger(__name__)
 
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
-        vol.Required(CONF_API_TOKEN): TextSelector(
+        vol.Required(CONF_CLIENT_ID): TextSelector(
+            TextSelectorConfig(type=TextSelectorType.TEXT)
+        ),
+        vol.Required(CONF_CLIENT_SECRET): TextSelector(
             TextSelectorConfig(type=TextSelectorType.PASSWORD)
         ),
     }
@@ -43,7 +47,10 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
 
 STEP_REAUTH_DATA_SCHEMA = vol.Schema(
     {
-        vol.Required(CONF_API_TOKEN): TextSelector(
+        vol.Required(CONF_CLIENT_ID): TextSelector(
+            TextSelectorConfig(type=TextSelectorType.TEXT)
+        ),
+        vol.Required(CONF_CLIENT_SECRET): TextSelector(
             TextSelectorConfig(type=TextSelectorType.PASSWORD)
         ),
     }
@@ -66,10 +73,11 @@ class KoreWirelessConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            api_token = user_input[CONF_API_TOKEN]
+            client_id = user_input[CONF_CLIENT_ID]
+            client_secret = user_input[CONF_CLIENT_SECRET]
 
             try:
-                account_info = await self._test_credentials(api_token)
+                account_info = await self._test_credentials(client_id, client_secret)
             except KoreWirelessAuthError:
                 errors["base"] = "invalid_auth"
             except KoreWirelessConnectionError:
@@ -78,14 +86,16 @@ class KoreWirelessConfigFlow(ConfigFlow, domain=DOMAIN):
                 _LOGGER.exception("Unexpected exception during setup")
                 errors["base"] = "unknown"
             else:
-                # Use account SID or first part of token as unique ID
-                unique_id = account_info.get("account_sid") or api_token[:16]
-                await self.async_set_unique_id(unique_id)
+                # Use client_id as unique ID
+                await self.async_set_unique_id(client_id)
                 self._abort_if_unique_id_configured()
 
                 return self.async_create_entry(
                     title="Kore Wireless SuperSIM",
-                    data={CONF_API_TOKEN: api_token},
+                    data={
+                        CONF_CLIENT_ID: client_id,
+                        CONF_CLIENT_SECRET: client_secret,
+                    },
                     options={CONF_SCAN_INTERVAL: DEFAULT_SCAN_INTERVAL},
                 )
 
@@ -111,10 +121,11 @@ class KoreWirelessConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            api_token = user_input[CONF_API_TOKEN]
+            client_id = user_input[CONF_CLIENT_ID]
+            client_secret = user_input[CONF_CLIENT_SECRET]
 
             try:
-                await self._test_credentials(api_token)
+                await self._test_credentials(client_id, client_secret)
             except KoreWirelessAuthError:
                 errors["base"] = "invalid_auth"
             except KoreWirelessConnectionError:
@@ -126,28 +137,40 @@ class KoreWirelessConfigFlow(ConfigFlow, domain=DOMAIN):
                 if self._reauth_entry:
                     self.hass.config_entries.async_update_entry(
                         self._reauth_entry,
-                        data={CONF_API_TOKEN: api_token},
+                        data={
+                            CONF_CLIENT_ID: client_id,
+                            CONF_CLIENT_SECRET: client_secret,
+                        },
                     )
                     await self.hass.config_entries.async_reload(
                         self._reauth_entry.entry_id
                     )
                     return self.async_abort(reason="reauth_successful")
 
+        # Pre-fill client_id if available
+        suggested_values = {}
+        if self._reauth_entry:
+            suggested_values[CONF_CLIENT_ID] = self._reauth_entry.data.get(CONF_CLIENT_ID, "")
+
         return self.async_show_form(
             step_id="reauth_confirm",
-            data_schema=STEP_REAUTH_DATA_SCHEMA,
+            data_schema=self.add_suggested_values_to_schema(
+                STEP_REAUTH_DATA_SCHEMA, suggested_values
+            ),
             errors=errors,
             description_placeholders={
                 "title": self._reauth_entry.title if self._reauth_entry else ""
             },
         )
 
-    async def _test_credentials(self, api_token: str) -> dict[str, Any]:
+    async def _test_credentials(
+        self, client_id: str, client_secret: str
+    ) -> dict[str, Any]:
         """Validate credentials and return account info."""
         session = async_get_clientsession(self.hass)
-        client = KoreWirelessAPI(session, api_token)
+        client = KoreWirelessAPI(session, client_id, client_secret)
 
-        # Try to fetch SIMs to validate the token
+        # Try to fetch SIMs to validate the credentials
         try:
             result = await client.get_sims(page_size=1)
         except KoreWirelessAuthError:

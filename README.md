@@ -10,6 +10,7 @@ A custom Home Assistant integration to monitor your Kore Wireless SuperSIM devic
 - **Fleet Management**: See which fleet each SIM belongs to
 - **Location Tracking**: Device tracker entities for SIM location (when available)
 - **Account Overview**: Total SIMs, active SIMs, and aggregate data usage
+- **OAuth2 Authentication**: Secure authentication with automatic token refresh
 
 ## Entities
 
@@ -39,7 +40,7 @@ Each SIM appears as a device with the following entities:
 
 - Home Assistant 2024.1.0 or newer
 - Kore Wireless account with API access
-- API Bearer token from [Kore Wireless Portal](https://www.korewireless.com/)
+- API Client ID and Client Secret from [Kore Wireless Developer Console](https://docs.korewireless.com/en-us/developers/get-started/apis)
 
 ## Installation
 
@@ -67,15 +68,17 @@ Each SIM appears as a device with the following entities:
 1. Go to **Settings** → **Devices & Services**
 2. Click **+ Add Integration**
 3. Search for "Kore Wireless SuperSIM"
-4. Enter your API token (Bearer token from Kore Wireless portal)
+4. Enter your **Client ID** and **Client Secret**
 5. Click **Submit**
 
-### Getting Your API Token
+### Getting Your API Credentials
 
-1. Log in to the [Kore Wireless Portal](https://www.korewireless.com/)
-2. Navigate to API settings or developer section
-3. Generate or copy your API Bearer token
-4. Use this token when configuring the integration
+1. Log in to the [Kore Wireless Developer Console](https://www.korewireless.com/)
+2. Navigate to the client management section
+3. Create a new API client if you haven't already
+4. Copy your **Client ID** and **Client Secret**
+   - Note: The Client Secret cannot be retrieved after initial creation, so save it securely
+5. Use these credentials when configuring the integration
 
 ### Options
 
@@ -84,6 +87,14 @@ After setup, you can configure additional options:
 1. Go to **Settings** → **Devices & Services**
 2. Find the Kore Wireless integration and click **Configure**
 3. Adjust the **Update interval** (60-3600 seconds, default: 300 seconds)
+
+## Authentication
+
+This integration uses OAuth2 Client Credentials flow:
+
+1. **Token Endpoint**: `https://api.korewireless.com/api-services/v1/auth/token`
+2. **Grant Type**: `client_credentials`
+3. **Automatic Refresh**: Tokens are automatically refreshed before expiration
 
 ## Usage Examples
 
@@ -139,7 +150,8 @@ entities:
 This integration uses the [Kore Wireless SuperSIM REST API](https://docs.korewireless.com/en-us/api/products/supersim):
 
 - Base URL: `https://supersim.api.korewireless.com/v1`
-- Authentication: Bearer token
+- Auth URL: `https://api.korewireless.com/api-services/v1/auth/token`
+- Authentication: OAuth2 Client Credentials
 - Endpoints used:
   - `GET /Sims` - List SIMs
   - `GET /UsageRecords` - Usage data
@@ -151,19 +163,26 @@ This integration uses the [Kore Wireless SuperSIM REST API](https://docs.korewir
 ### Integration not loading
 
 - Check Home Assistant logs for errors
-- Verify your API token is correct
+- Verify your Client ID and Client Secret are correct
 - Ensure you have network connectivity to Kore Wireless API
 
 ### No data showing
 
 - Verify your SIMs are properly set up in Kore Wireless
-- Check that your API token has the necessary permissions
+- Check that your API client has the necessary permissions
 - Wait for the first update cycle (default: 5 minutes)
 
 ### Authentication errors
 
-- Regenerate your API token in the Kore Wireless portal
-- Remove and re-add the integration with the new token
+- Regenerate your Client Secret in the Kore Wireless Developer Console
+- Remove and re-add the integration with the new credentials
+- Note: Client Secrets cannot be retrieved after creation, only regenerated
+
+### "Invalid client credentials" error
+
+- Double-check that you're using the correct Client ID
+- Ensure the Client Secret hasn't been regenerated since setup
+- Verify your API client is active in the Kore Wireless console
 
 ## Contributing
 

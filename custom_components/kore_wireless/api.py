@@ -2,12 +2,13 @@
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any
 
 import aiohttp
 from aiohttp import ClientError, ClientResponseError
 
-from .const import API_BASE_URL
+from .const import API_BASE_URL, AUTH_TOKEN_URL
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -25,16 +26,66 @@ class KoreWirelessConnectionError(KoreWirelessAPIError):
 
 
 class KoreWirelessAPI:
-    """Kore Wireless SuperSIM API client."""
+    """Kore Wireless SuperSIM API client with OAuth2 authentication."""
 
-    def __init__(self, session: aiohttp.ClientSession, api_token: str) -> None:
+    def __init__(
+        self,
+        session: aiohttp.ClientSession,
+        client_id: str,
+        client_secret: str,
+    ) -> None:
         """Initialize the API client."""
         self._session = session
-        self._api_token = api_token
-        self._headers = {
-            "Authorization": f"Bearer {api_token}",
-            "Content-Type": "application/json",
-        }
+        self._client_id = client_id
+        self._client_secret = client_secret
+        self._access_token: str | None = None
+        self._token_expires_at: float = 0
+
+    async def _get_access_token(self) -> str:
+        """Get a valid access token, refreshing if necessary."""
+        # Check if we have a valid token (with 60 second buffer)
+        if self._access_token and time.time() < (self._token_expires_at - 60):
+            return self._access_token
+
+        # Request new token
+        try:
+            async with self._session.post(
+                AUTH_TOKEN_URL,
+                headers={
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "Cache-Control": "no-cache",
+                },
+                data={
+                    "grant_type": "client_credentials",
+                    "client_id": self._client_id,
+                    "client_secret": self._client_secret,
+                },
+            ) as response:
+                if response.status == 401:
+                    raise KoreWirelessAuthError("Invalid client credentials")
+                if response.status == 403:
+                    raise KoreWirelessAuthError("Access forbidden")
+
+                response.raise_for_status()
+                data = await response.json()
+
+                self._access_token = data.get("access_token")
+                expires_in = int(data.get("expires_in", 3600))
+                self._token_expires_at = time.time() + expires_in
+
+                _LOGGER.debug("Obtained new access token, expires in %d seconds", expires_in)
+
+                if not self._access_token:
+                    raise KoreWirelessAuthError("No access token in response")
+
+                return self._access_token
+
+        except ClientResponseError as err:
+            _LOGGER.error("Token request failed: %s", err)
+            raise KoreWirelessAuthError(f"Token request failed: {err}") from err
+        except ClientError as err:
+            _LOGGER.error("Connection error during token request: %s", err)
+            raise KoreWirelessConnectionError(f"Connection error: {err}") from err
 
     async def _request(
         self,
@@ -43,19 +94,44 @@ class KoreWirelessAPI:
         params: dict[str, Any] | None = None,
         data: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Make an API request."""
+        """Make an API request with automatic token handling."""
         url = f"{API_BASE_URL}/{endpoint}"
+
+        # Get valid access token
+        access_token = await self._get_access_token()
+
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json",
+        }
 
         try:
             async with self._session.request(
                 method,
                 url,
-                headers=self._headers,
+                headers=headers,
                 params=params,
                 json=data,
             ) as response:
                 if response.status == 401:
-                    raise KoreWirelessAuthError("Invalid API token")
+                    # Token might have expired, clear it and retry once
+                    self._access_token = None
+                    self._token_expires_at = 0
+                    access_token = await self._get_access_token()
+                    headers["Authorization"] = f"Bearer {access_token}"
+
+                    async with self._session.request(
+                        method,
+                        url,
+                        headers=headers,
+                        params=params,
+                        json=data,
+                    ) as retry_response:
+                        if retry_response.status == 401:
+                            raise KoreWirelessAuthError("Invalid credentials")
+                        retry_response.raise_for_status()
+                        return await retry_response.json()
+
                 if response.status == 403:
                     raise KoreWirelessAuthError("Access forbidden")
 
@@ -113,12 +189,24 @@ class KoreWirelessAPI:
         sim: str | None = None,
         fleet: str | None = None,
         network: str | None = None,
-        granularity: str = "day",
+        granularity: str = "all",
+        group: str | None = None,
         start_time: str | None = None,
         end_time: str | None = None,
         page_size: int = 50,
     ) -> dict[str, Any]:
-        """Get usage records."""
+        """Get usage records.
+
+        Args:
+            sim: Filter by SIM SID
+            fleet: Filter by Fleet SID
+            network: Filter by Network SID
+            granularity: one of 'hour', 'day', 'all' (default 'all' for totals)
+            group: Group results by 'sim', 'fleet', 'network', or 'isoCountry'
+            start_time: ISO 8601 start time
+            end_time: ISO 8601 end time
+            page_size: Number of results per page
+        """
         params: dict[str, Any] = {
             "PageSize": page_size,
             "Granularity": granularity,
@@ -129,6 +217,8 @@ class KoreWirelessAPI:
             params["Fleet"] = fleet
         if network is not None:
             params["Network"] = network
+        if group is not None:
+            params["Group"] = group
         if start_time is not None:
             params["StartTime"] = start_time
         if end_time is not None:
@@ -204,6 +294,41 @@ class KoreWirelessAPI:
             data["AccountSid"] = account_sid
 
         return await self._request("POST", f"Sims/{sid}", data=data)
+
+    async def get_sim_ip_addresses(self, sim_sid: str) -> dict[str, Any]:
+        """Get IP addresses for a SIM."""
+        return await self._request("GET", f"Sims/{sim_sid}/IpAddresses")
+
+    async def get_network(self, sid: str) -> dict[str, Any]:
+        """Get a specific network by SID."""
+        return await self._request("GET", f"Networks/{sid}")
+
+    async def activate_sim(self, sid: str) -> dict[str, Any]:
+        """Activate a SIM (set status to active)."""
+        return await self.update_sim(sid, status="active")
+
+    async def deactivate_sim(self, sid: str) -> dict[str, Any]:
+        """Deactivate a SIM (set status to inactive)."""
+        return await self.update_sim(sid, status="inactive")
+
+    async def get_account_usage_records(
+        self,
+        start: str | None = None,
+        end: str | None = None,
+        granularity: str = "day",
+        page_size: int = 50,
+    ) -> dict[str, Any]:
+        """Get account-level usage records."""
+        params: dict[str, Any] = {
+            "PageSize": page_size,
+            "Granularity": granularity,
+        }
+        if start is not None:
+            params["Start"] = start
+        if end is not None:
+            params["End"] = end
+
+        return await self._request("GET", "UsageRecords", params=params)
 
     async def get_all_sims(self) -> list[dict[str, Any]]:
         """Get all SIMs (handles pagination)."""

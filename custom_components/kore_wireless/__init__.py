@@ -11,7 +11,8 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import KoreWirelessAPI
 from .const import (
-    CONF_API_TOKEN,
+    CONF_CLIENT_ID,
+    CONF_CLIENT_SECRET,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
 )
@@ -22,6 +23,7 @@ _LOGGER = logging.getLogger(__name__)
 PLATFORMS: list[Platform] = [
     Platform.SENSOR,
     Platform.BINARY_SENSOR,
+    Platform.BUTTON,
     Platform.DEVICE_TRACKER,
 ]
 
@@ -40,7 +42,11 @@ type KoreWirelessConfigEntry = ConfigEntry[KoreWirelessRuntimeData]
 async def async_setup_entry(hass: HomeAssistant, entry: KoreWirelessConfigEntry) -> bool:
     """Set up Kore Wireless SuperSIM from a config entry."""
     session = async_get_clientsession(hass)
-    client = KoreWirelessAPI(session, entry.data[CONF_API_TOKEN])
+    client = KoreWirelessAPI(
+        session,
+        entry.data[CONF_CLIENT_ID],
+        entry.data[CONF_CLIENT_SECRET],
+    )
 
     update_interval = entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
     coordinator = KoreWirelessDataUpdateCoordinator(
