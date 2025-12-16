@@ -178,10 +178,9 @@ class KoreWirelessDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     except KoreWirelessAPIError as err:
                         _LOGGER.debug("Failed to get billing periods for SIM %s: %s", sim_sid, err)
 
-                # Get IP addresses
+                # Get IP addresses (only available when SIM has active data session)
                 try:
                     ip_response = await self.client.get_sim_ip_addresses(sim_sid)
-                    _LOGGER.debug("IP response for SIM %s: %s", sim_sid, ip_response)
                     ip_addresses = (
                         ip_response.get("ip_addresses")
                         or ip_response.get("ipAddresses")
