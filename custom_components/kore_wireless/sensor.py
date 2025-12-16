@@ -134,7 +134,7 @@ def _get_sim_network_country(data: dict[str, Any], sim_sid: str) -> str | None:
     return None
 
 
-def _get_sim_ip_address(data: dict[str, Any], sim_sid: str) -> str | None:
+def _get_sim_ip_address(data: dict[str, Any], sim_sid: str) -> str:
     """Get SIM IP address."""
     ip_addresses = data.get("ip_by_sim", {}).get(sim_sid, [])
     if ip_addresses:
@@ -142,8 +142,8 @@ def _get_sim_ip_address(data: dict[str, Any], sim_sid: str) -> str | None:
         ip = first_ip.get("ip_address") or first_ip.get("ipAddress")
         if ip:
             return ip
-    # Return None if no active data session
-    return None
+    # IP only available for VPN-enabled fleets
+    return "VPN required"
 
 
 def _get_total_sims(data: dict[str, Any], _: str) -> int:
