@@ -37,7 +37,6 @@ DEFAULT_SIM_SENSORS = [
     "network_country",
     "ip_address",
     "pending_updates",
-    "spending",
 ]
 
 
@@ -194,14 +193,6 @@ def _get_sim_pending_updates(data: dict[str, Any], sim_sid: str) -> int:
     return data.get("settings_by_sim", {}).get(sim_sid, {}).get("pending_updates", 0)
 
 
-def _get_sim_spending(data: dict[str, Any], sim_sid: str) -> float:
-    """Get SIM spending (billed data) in MB."""
-    billed = data.get("billing_by_sim", {}).get(sim_sid, {}).get("data_total_billed")
-    if billed is not None:
-        return _bytes_to_mb(billed)
-    return 0.0
-
-
 def _get_account_billing_start(data: dict[str, Any], _: str) -> date | None:
     """Get account billing period start date."""
     start_time = data.get("account", {}).get("billing_period_start")
@@ -229,11 +220,6 @@ def _get_account_billing_end(data: dict[str, Any], _: str) -> date | None:
 def _get_account_pending_updates(data: dict[str, Any], _: str) -> int:
     """Get account total pending OTA updates."""
     return data.get("account", {}).get("pending_updates", 0)
-
-
-def _get_account_spending(data: dict[str, Any], _: str) -> float:
-    """Get account total spending (billed data) in MB."""
-    return _bytes_to_mb(data.get("account", {}).get("data_total_billed", 0))
 
 
 SIM_SENSOR_DESCRIPTIONS: tuple[KoreWirelessSensorEntityDescription, ...] = (
@@ -344,17 +330,6 @@ SIM_SENSOR_DESCRIPTIONS: tuple[KoreWirelessSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=_get_sim_pending_updates,
     ),
-    KoreWirelessSensorEntityDescription(
-        key="spending",
-        translation_key="spending",
-        name="Spending",
-        icon="mdi:currency-usd",
-        native_unit_of_measurement=UnitOfInformation.MEGABYTES,
-        device_class=SensorDeviceClass.DATA_SIZE,
-        state_class=SensorStateClass.TOTAL,
-        suggested_display_precision=3,
-        value_fn=_get_sim_spending,
-    ),
 )
 
 ACCOUNT_SENSOR_DESCRIPTIONS: tuple[KoreWirelessSensorEntityDescription, ...] = (
@@ -464,18 +439,6 @@ ACCOUNT_SENSOR_DESCRIPTIONS: tuple[KoreWirelessSensorEntityDescription, ...] = (
         icon="mdi:calendar-end",
         device_class=SensorDeviceClass.DATE,
         value_fn=_get_account_billing_end,
-        is_account_level=True,
-    ),
-    KoreWirelessSensorEntityDescription(
-        key="account_spending",
-        translation_key="account_spending",
-        name="Total Spending",
-        icon="mdi:currency-usd",
-        native_unit_of_measurement=UnitOfInformation.MEGABYTES,
-        device_class=SensorDeviceClass.DATA_SIZE,
-        state_class=SensorStateClass.TOTAL,
-        suggested_display_precision=3,
-        value_fn=_get_account_spending,
         is_account_level=True,
     ),
 )
