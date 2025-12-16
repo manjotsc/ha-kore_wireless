@@ -247,6 +247,10 @@ class KoreWirelessAPI:
         params = {"PageSize": page_size}
         return await self._request("GET", "Networks", params=params)
 
+    async def get_network(self, sid: str) -> dict[str, Any]:
+        """Get a specific network by SID."""
+        return await self._request("GET", f"Networks/{sid}")
+
     async def get_sms_commands(
         self,
         sim: str | None = None,

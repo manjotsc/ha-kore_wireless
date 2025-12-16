@@ -112,7 +112,6 @@ class KoreWirelessDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                         or network_usage.get("usageRecords")
                         or []
                     )
-                    _LOGGER.debug("Network usage for SIM %s: %s", sim_sid, network_records)
 
                     # Find the most recent/active network
                     if network_records:
@@ -121,14 +120,27 @@ class KoreWirelessDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                             network_records,
                             key=lambda r: r.get("data_total") or r.get("dataTotal") or 0
                         )
+
                         network_sid = best_record.get("network_sid") or best_record.get("networkSid")
-                        if network_sid and network_sid in networks_by_sid:
-                            network_by_sim[sim_sid] = dict(networks_by_sid[network_sid])
-                            _LOGGER.debug(
-                                "SIM %s network: %s",
-                                sim_sid,
-                                network_by_sim[sim_sid].get("friendly_name")
-                            )
+
+                        if network_sid:
+                            # Check if network is in our cache, if not fetch it
+                            if network_sid not in networks_by_sid:
+                                try:
+                                    network_data = await self.client.get_network(network_sid)
+                                    networks_by_sid[network_sid] = network_data
+                                    _LOGGER.debug("Fetched network %s: %s", network_sid, network_data.get("friendly_name"))
+                                except KoreWirelessAPIError as err:
+                                    _LOGGER.debug("Failed to fetch network %s: %s", network_sid, err)
+
+                            if network_sid in networks_by_sid:
+                                network_by_sim[sim_sid] = dict(networks_by_sid[network_sid])
+                                _LOGGER.debug(
+                                    "SIM %s network: %s (%s)",
+                                    sim_sid,
+                                    network_by_sim[sim_sid].get("friendly_name"),
+                                    network_by_sim[sim_sid].get("iso_country"),
+                                )
                 except KoreWirelessAuthError:
                     raise
                 except KoreWirelessAPIError as err:
