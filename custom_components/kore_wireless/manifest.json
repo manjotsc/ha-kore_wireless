@@ -3,7 +3,7 @@
   "name": "Kore Wireless SuperSIM",
   "codeowners": [],
   "config_flow": true,
-  "dependencies": [],
+  "dependencies": ["file_upload"],
   "documentation": "https://github.com/your-repo/ha-kore_wireless",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/your-repo/ha-kore_wireless/issues",

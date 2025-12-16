@@ -206,7 +206,7 @@ SIM_SENSOR_DESCRIPTIONS: tuple[KoreWirelessSensorEntityDescription, ...] = (
     KoreWirelessSensorEntityDescription(
         key="data_total",
         translation_key="data_total",
-        name="Total Usage",
+        name="Data Total",
         icon="mdi:chart-line",
         native_unit_of_measurement=UnitOfInformation.MEGABYTES,
         device_class=SensorDeviceClass.DATA_SIZE,

@@ -4,11 +4,11 @@ from __future__ import annotations
 import csv
 import io
 import logging
-from pathlib import Path
 from typing import Any
 
 import voluptuous as vol
 
+from homeassistant.components.file_upload import process_uploaded_file
 from homeassistant.config_entries import (
     ConfigEntry,
     ConfigFlow,
@@ -97,7 +97,10 @@ class KoreWirelessConfigFlow(ConfigFlow, domain=DOMAIN):
         """Handle the initial step - show menu to choose setup method."""
         return self.async_show_menu(
             step_id="user",
-            menu_options=["manual", "csv_upload"],
+            menu_options={
+                "manual": "Enter credentials manually",
+                "csv_upload": "Upload credentials CSV file",
+            },
         )
 
     async def async_step_manual(
@@ -206,16 +209,8 @@ class KoreWirelessConfigFlow(ConfigFlow, domain=DOMAIN):
 
     def _read_uploaded_file(self, file_id: str) -> str:
         """Read content from uploaded file."""
-        file_path = Path(self.hass.config.path("www", file_id))
-        if file_path.exists():
+        with process_uploaded_file(self.hass, file_id) as file_path:
             return file_path.read_text(encoding="utf-8")
-
-        # Try alternate location for uploaded files
-        file_path = Path(self.hass.config.path(file_id))
-        if file_path.exists():
-            return file_path.read_text(encoding="utf-8")
-
-        raise FileNotFoundError(f"Uploaded file not found: {file_id}")
 
     def _parse_kore_csv(self, content: str) -> dict[str, str]:
         """Parse Kore Wireless credentials CSV file.

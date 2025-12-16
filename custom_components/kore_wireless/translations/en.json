@@ -52,6 +52,14 @@
     "step": {
       "user": {
         "title": "Kore Wireless SuperSIM",
+        "description": "Choose how you want to set up your Kore Wireless account.",
+        "menu_options": {
+          "manual": "Enter credentials manually",
+          "csv_upload": "Upload credentials CSV file"
+        }
+      },
+      "manual": {
+        "title": "Enter Credentials",
         "description": "Enter your Kore Wireless API credentials to connect to your SuperSIM account.",
         "data": {
           "client_id": "Client ID",
@@ -60,6 +68,16 @@
         "data_description": {
           "client_id": "Client ID from Kore Wireless Developer Console",
           "client_secret": "Client Secret from Kore Wireless Developer Console"
+        }
+      },
+      "csv_upload": {
+        "title": "Upload Credentials File",
+        "description": "Upload the CSV file exported from Kore Wireless Developer Console. The file contains your client credentials.",
+        "data": {
+          "credentials_file": "Credentials CSV File"
+        },
+        "data_description": {
+          "credentials_file": "CSV file downloaded from Kore Wireless containing client_id and client_secret"
         }
       },
       "reauth_confirm": {
@@ -78,6 +96,7 @@
     "error": {
       "cannot_connect": "Failed to connect to Kore Wireless API",
       "invalid_auth": "Invalid client credentials",
+      "invalid_csv": "Invalid CSV file. Ensure it contains client_id and client_secret fields.",
       "unknown": "Unexpected error occurred"
     },
     "abort": {
@@ -122,7 +141,7 @@
         "name": "Data Download"
       },
       "data_total": {
-        "name": "Total Usage"
+        "name": "Data Total"
       },
       "sms_count": {
         "name": "SMS Count"
