@@ -40,3 +40,14 @@ SIM_STATUS_READY: Final = "ready"
 SIM_STATUS_ACTIVE: Final = "active"
 SIM_STATUS_INACTIVE: Final = "inactive"
 SIM_STATUS_SCHEDULED: Final = "scheduled"
+
+# Services
+SERVICE_SEND_SMS: Final = "send_sms"
+SERVICE_GET_SMS_COMMANDS: Final = "get_sms_commands"
+
+# Service attributes
+ATTR_DEVICE_ID: Final = "device_id"
+ATTR_MESSAGE: Final = "message"
+ATTR_CALLBACK_URL: Final = "callback_url"
+ATTR_DIRECTION: Final = "direction"
+ATTR_STATUS: Final = "status"

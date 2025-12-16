@@ -1,7 +1,10 @@
 """Config flow for Kore Wireless SuperSIM integration."""
 from __future__ import annotations
 
+import csv
+import io
 import logging
+from pathlib import Path
 from typing import Any
 
 import voluptuous as vol
@@ -17,6 +20,8 @@ from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
     BooleanSelector,
+    FileSelector,
+    FileSelectorConfig,
     NumberSelector,
     NumberSelectorConfig,
     NumberSelectorMode,
@@ -51,6 +56,8 @@ from .const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+CONF_CREDENTIALS_FILE = "credentials_file"
 
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
@@ -87,7 +94,16 @@ class KoreWirelessConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Handle the initial step."""
+        """Handle the initial step - show menu to choose setup method."""
+        return self.async_show_menu(
+            step_id="user",
+            menu_options=["manual", "csv_upload"],
+        )
+
+    async def async_step_manual(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Handle manual credential entry."""
         errors: dict[str, str] = {}
 
         if user_input is not None:
@@ -95,7 +111,7 @@ class KoreWirelessConfigFlow(ConfigFlow, domain=DOMAIN):
             client_secret = user_input[CONF_CLIENT_SECRET]
 
             try:
-                account_info = await self._test_credentials(client_id, client_secret)
+                await self._test_credentials(client_id, client_secret)
             except KoreWirelessAuthError:
                 errors["base"] = "invalid_auth"
             except KoreWirelessConnectionError:
@@ -118,10 +134,116 @@ class KoreWirelessConfigFlow(ConfigFlow, domain=DOMAIN):
                 )
 
         return self.async_show_form(
-            step_id="user",
+            step_id="manual",
             data_schema=STEP_USER_DATA_SCHEMA,
             errors=errors,
         )
+
+    async def async_step_csv_upload(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Handle CSV file upload for credentials."""
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            file_id = user_input.get(CONF_CREDENTIALS_FILE)
+
+            if file_id:
+                try:
+                    # Read the uploaded file
+                    uploaded_file = await self.hass.async_add_executor_job(
+                        self._read_uploaded_file, file_id
+                    )
+
+                    # Parse CSV content
+                    credentials = self._parse_kore_csv(uploaded_file)
+
+                    if not credentials.get("client_id") or not credentials.get("client_secret"):
+                        errors["base"] = "invalid_csv"
+                    else:
+                        client_id = credentials["client_id"]
+                        client_secret = credentials["client_secret"]
+
+                        try:
+                            await self._test_credentials(client_id, client_secret)
+                        except KoreWirelessAuthError:
+                            errors["base"] = "invalid_auth"
+                        except KoreWirelessConnectionError:
+                            errors["base"] = "cannot_connect"
+                        except Exception:
+                            _LOGGER.exception("Unexpected exception during setup")
+                            errors["base"] = "unknown"
+                        else:
+                            # Use client_id as unique ID
+                            await self.async_set_unique_id(client_id)
+                            self._abort_if_unique_id_configured()
+
+                            title = credentials.get("client_name", "Kore Wireless SuperSIM")
+
+                            return self.async_create_entry(
+                                title=title,
+                                data={
+                                    CONF_CLIENT_ID: client_id,
+                                    CONF_CLIENT_SECRET: client_secret,
+                                },
+                                options={CONF_SCAN_INTERVAL: DEFAULT_SCAN_INTERVAL},
+                            )
+                except Exception as err:
+                    _LOGGER.exception("Failed to parse CSV file: %s", err)
+                    errors["base"] = "invalid_csv"
+
+        return self.async_show_form(
+            step_id="csv_upload",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_CREDENTIALS_FILE): FileSelector(
+                        FileSelectorConfig(accept=".csv")
+                    ),
+                }
+            ),
+            errors=errors,
+        )
+
+    def _read_uploaded_file(self, file_id: str) -> str:
+        """Read content from uploaded file."""
+        file_path = Path(self.hass.config.path("www", file_id))
+        if file_path.exists():
+            return file_path.read_text(encoding="utf-8")
+
+        # Try alternate location for uploaded files
+        file_path = Path(self.hass.config.path(file_id))
+        if file_path.exists():
+            return file_path.read_text(encoding="utf-8")
+
+        raise FileNotFoundError(f"Uploaded file not found: {file_id}")
+
+    def _parse_kore_csv(self, content: str) -> dict[str, str]:
+        """Parse Kore Wireless credentials CSV file.
+
+        Expected format:
+        Client Details,Value
+        client_name,<name>
+        client_id,<id>
+        client_secret,<secret>
+        date_updated,<date>
+        """
+        credentials: dict[str, str] = {}
+
+        reader = csv.reader(io.StringIO(content))
+
+        for row in reader:
+            if len(row) >= 2:
+                key = row[0].strip().lower()
+                value = row[1].strip()
+
+                if key == "client_id":
+                    credentials["client_id"] = value
+                elif key == "client_secret":
+                    credentials["client_secret"] = value
+                elif key == "client_name":
+                    credentials["client_name"] = value
+
+        return credentials
 
     async def async_step_reauth(
         self, entry_data: dict[str, Any]

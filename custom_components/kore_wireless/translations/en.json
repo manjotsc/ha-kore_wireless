@@ -1,4 +1,53 @@
 {
+  "services": {
+    "send_sms": {
+      "name": "Send SMS",
+      "description": "Send an SMS message to a SIM card.",
+      "fields": {
+        "device_id": {
+          "name": "SIM Device",
+          "description": "The SIM card device to send the SMS to."
+        },
+        "message": {
+          "name": "Message",
+          "description": "The SMS message content to send (max 160 characters)."
+        },
+        "callback_url": {
+          "name": "Callback URL",
+          "description": "Optional URL to receive delivery status callbacks."
+        }
+      }
+    },
+    "get_sms_commands": {
+      "name": "Get SMS Commands",
+      "description": "Retrieve SMS command history for a SIM card.",
+      "fields": {
+        "device_id": {
+          "name": "SIM Device",
+          "description": "The SIM card device to get SMS history for."
+        },
+        "direction": {
+          "name": "Direction",
+          "description": "Filter by SMS direction."
+        },
+        "status": {
+          "name": "Status",
+          "description": "Filter by SMS status."
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "device_not_found": {
+      "message": "Device not found."
+    },
+    "invalid_device": {
+      "message": "Device is not a Kore Wireless SIM device."
+    },
+    "integration_not_found": {
+      "message": "No Kore Wireless integration found for device."
+    }
+  },
   "config": {
     "step": {
       "user": {

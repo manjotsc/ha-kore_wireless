@@ -258,16 +258,66 @@ class KoreWirelessAPI:
         sim: str,
         payload: str,
         callback_url: str | None = None,
+        callback_method: str | None = None,
     ) -> dict[str, Any]:
-        """Send an SMS command to a SIM."""
-        data: dict[str, Any] = {
+        """Send an SMS command to a SIM.
+
+        Note: This endpoint requires form-urlencoded data, not JSON.
+        """
+        url = f"{API_BASE_URL}/SmsCommands"
+        access_token = await self._get_access_token()
+
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/x-www-form-urlencoded",
+        }
+
+        form_data: dict[str, str] = {
             "Sim": sim,
             "Payload": payload,
         }
         if callback_url is not None:
-            data["CallbackUrl"] = callback_url
+            form_data["CallbackUrl"] = callback_url
+        if callback_method is not None:
+            form_data["CallbackMethod"] = callback_method
 
-        return await self._request("POST", "SmsCommands", data=data)
+        try:
+            async with self._session.post(
+                url,
+                headers=headers,
+                data=form_data,
+            ) as response:
+                if response.status == 401:
+                    # Token might have expired, retry once
+                    self._access_token = None
+                    self._token_expires_at = 0
+                    access_token = await self._get_access_token()
+                    headers["Authorization"] = f"Bearer {access_token}"
+
+                    async with self._session.post(
+                        url,
+                        headers=headers,
+                        data=form_data,
+                    ) as retry_response:
+                        if retry_response.status == 401:
+                            raise KoreWirelessAuthError("Invalid credentials")
+                        retry_response.raise_for_status()
+                        return await retry_response.json()
+
+                if response.status == 403:
+                    raise KoreWirelessAuthError("Access forbidden")
+
+                response.raise_for_status()
+                result = await response.json()
+                _LOGGER.debug("SMS command response: %s", result)
+                return result
+
+        except ClientResponseError as err:
+            _LOGGER.error("SMS command failed: %s", err)
+            raise KoreWirelessAPIError(f"SMS command failed: {err}") from err
+        except ClientError as err:
+            _LOGGER.error("Connection error sending SMS: %s", err)
+            raise KoreWirelessConnectionError(f"Connection error: {err}") from err
 
     async def update_sim(
         self,

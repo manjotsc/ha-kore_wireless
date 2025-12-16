@@ -1,0 +1,71 @@
+send_sms:
+  name: Send SMS
+  description: Send an SMS message to a SIM card.
+  fields:
+    device_id:
+      name: SIM Device
+      description: The SIM card device to send the SMS to.
+      required: true
+      selector:
+        device:
+          integration: kore_wireless
+    message:
+      name: Message
+      description: The SMS message content to send (max 160 characters).
+      required: true
+      example: "Hello from Home Assistant!"
+      selector:
+        text:
+          multiline: false
+    callback_url:
+      name: Callback URL
+      description: Optional URL to receive delivery status callbacks.
+      required: false
+      example: "https://example.com/webhook"
+      selector:
+        text:
+
+get_sms_commands:
+  name: Get SMS Commands
+  description: Retrieve SMS command history for a SIM card.
+  fields:
+    device_id:
+      name: SIM Device
+      description: The SIM card device to get SMS history for.
+      required: true
+      selector:
+        device:
+          integration: kore_wireless
+    direction:
+      name: Direction
+      description: Filter by SMS direction.
+      required: false
+      default: "all"
+      selector:
+        select:
+          options:
+            - label: "All"
+              value: "all"
+            - label: "Sent (to SIM)"
+              value: "to_sim"
+            - label: "Received (from SIM)"
+              value: "from_sim"
+    status:
+      name: Status
+      description: Filter by SMS status.
+      required: false
+      selector:
+        select:
+          options:
+            - label: "All"
+              value: ""
+            - label: "Queued"
+              value: "queued"
+            - label: "Sent"
+              value: "sent"
+            - label: "Delivered"
+              value: "delivered"
+            - label: "Received"
+              value: "received"
+            - label: "Failed"
+              value: "failed"
