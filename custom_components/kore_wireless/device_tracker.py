@@ -3,8 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from homeassistant.components.device_tracker import SourceType
-from homeassistant.components.device_tracker.config_entry import TrackerEntity
+from homeassistant.components.device_tracker import SourceType, TrackerEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -103,20 +102,6 @@ class KoreWirelessSimTracker(
                     for record in reversed(records):
                         if "longitude" in record:
                             return record.get("longitude")
-        return None
-
-    @property
-    def location_name(self) -> str | None:
-        """Return a location name for the current location of the device."""
-        for sim in self.coordinator.data.get("sims", []):
-            if sim.get("sid") == self._sim_sid:
-                usage = self.coordinator.data.get("usage_by_sim", {}).get(self._sim_sid, {})
-                records = usage.get("records", [])
-                if records:
-                    latest = records[-1]
-                    network = latest.get("network", {})
-                    if isinstance(network, dict):
-                        return network.get("friendly_name")
         return None
 
     @property
