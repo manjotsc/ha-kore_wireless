@@ -213,11 +213,6 @@
       "refresh": {
         "name": "Refresh Data"
       }
-    },
-    "device_tracker": {
-      "location": {
-        "name": "Location"
-      }
     }
   }
 }
